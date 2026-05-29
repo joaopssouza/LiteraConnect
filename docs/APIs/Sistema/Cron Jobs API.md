@@ -3,7 +3,7 @@
 Um job em background crítico para a arquitetura Polyglot. Como o **Redis** acumula as visualizações do dia-a-dia em memória para garantir rapidez, esta API recolhe esses números e os persiste no **Supabase** de forma permanente antes que as chaves do Redis expirem (TTL).
 
 ## Segurança de Sistema (Machine-to-Machine)
-- 🔒 **Protegida por Secret:** Esta rota não usa JWT de usuário. Ela espera um header `Authorization: Bearer {CRON_SECRET}` configurado na Vercel para garantir que apenas o serviço de agendamento (Vercel Cron ou GitHub Actions) possa invocá-la.
+- 🔒 **Protegida por Secret:** Esta rota não usa JWT de usuário. Ela espera um header `Authorization: Bearer {CRON_SECRET}` configurado na sua infraestrutura para garantir que apenas o serviço de agendamento local (Container Docker Ofelia) possa invocá-la.
 
 ---
 

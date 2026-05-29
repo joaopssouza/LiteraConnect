@@ -1,6 +1,6 @@
 # Backend e APIs (Next.js)
 
-O backend do LiteraConnect vive dentro da pasta `app/api/` e utiliza o ecossistema Serverless do Next.js (App Router).
+O backend do LiteraConnect vive dentro da pasta `app/api/` e utiliza as API Routes e Server Actions do Next.js. O sistema é executado em modo `standalone` dentro de um container Docker, otimizando o consumo de recursos na infraestrutura self-hosted.
 
 ## Segurança Global e Auth
 - Validação de sessão estrita via SSR com `@supabase/ssr` (`auth.getUser()`).
