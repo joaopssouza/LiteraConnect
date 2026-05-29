@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Instalar TipTap e dependências essenciais",
+			"type": "shell",
+			"command": "npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-link @tiptap/extension-image @tiptap/extension-underline @tiptap/extension-highlight",
+			"group": "build"
+		}
+	]
+}

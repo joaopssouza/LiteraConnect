@@ -1,0 +1,36 @@
+{
+  "name": "LiteraConnect",
+  "short_name": "LiteraConnect",
+  "description": "Rede social literária para compartilhar resenhas e descobrir leituras.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff8f2",
+  "theme_color": "#b81c2e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/feed.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Feed de resenhas"
+    }
+  ],
+  "categories": ["social", "books", "education"],
+  "lang": "pt-BR",
+  "dir": "ltr"
+}

@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "supabase": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${workspaceFolder}/scripts/start-supabase-mcp.cjs"
+      ]
+    }
+  }
+}

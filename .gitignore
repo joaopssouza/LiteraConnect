@@ -1,0 +1,15 @@
+node_modules/
+.next/
+coverage/
+.DS_Store
+*.log
+.env
+.env.*
+
+certificates
+
+# Arquivo de ambiente de produção — contém secrets reais do servidor
+.env.server
+
+# Artefatos de runtime do Docker (gerados no servidor, não versionados)
+supabase/volumes/

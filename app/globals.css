@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@theme {
+  /* Paleta Elegante e Vibrante (HSL) — modo claro */
+  --color-brand-1: hsl(358, 70%, 15%); /* Vinho Profundo */
+  --color-brand-2: hsl(346, 88%, 52%); /* Vermelho Vibrante */
+  --color-brand-3: hsl(11, 88%, 61%);  /* Coral Dinâmico */
+  --color-brand-4: hsl(39, 100%, 72%); /* Ouro Suave */
+  --color-brand-5: hsl(28, 100%, 95%); /* Creme Luxo */
+
+  --color-glass-white: hsla(0, 0%, 100%, 0.7);
+  --color-glass-border: hsla(0, 0%, 0%, 0.05);
+
+  --font-sans: 'Outfit', 'Inter', system-ui, sans-serif;
+}
+
+/* ─── Dark Mode ──────────────────────────────────────── */
+:root {
+  --bg-main: hsl(28, 100%, 97%);
+  --text-main: hsl(358, 70%, 15%);
+  --surface: #ffffff;
+  --border: hsla(358, 30%, 80%);
+}
+
+.dark {
+  /* 60% - Fundo Base (Zinc 950) */
+  --bg-main: hsl(240 10% 3.9%);
+  --text-main: hsl(0 0% 98%);
+
+  /* 30% - Superfícies e Cards (Zinc 900) */
+  --surface: hsl(240 10% 6%);
+  --border: hsl(240 3.7% 15.9%);
+  --muted: hsl(240 3.7% 15.9%);
+  --muted-foreground: hsl(240 5% 64.9%);
+
+  /* 10% - Destaques e Ações (Electric Blue & Secondary Accents) */
+  --color-brand-2: hsl(217.2 91.2% 59.8%); 
+  --color-brand-3: hsl(263.4 70% 50.4%); /* Violeta Vibrante para Comentários */
+  --color-brand-4: hsl(160 84% 39%);     /* Esmeralda para Seguidores/Novidades */
+  --color-brand-1: hsl(0 0% 100%);
+  --color-brand-5: hsl(240 10% 12%);
+}
+
+@layer base {
+  body {
+    @apply selection:bg-brand-2/20 selection:text-brand-1;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Skip to content — acessibilidade */
+  .skip-link {
+    @apply fixed left-2 top-2 z-[99999] px-4 py-2 rounded-lg text-sm font-medium;
+    @apply bg-brand-2 text-white;
+    transform: translateY(-120%);
+    transition: transform 0.15s ease;
+  }
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+}
+
+/* ─── Glassmorphism ──────────────────────────────────── */
+.glass-effect {
+  @apply backdrop-blur-md border shadow-xl;
+  background-color: var(--color-glass-white);
+  border-color: var(--color-glass-border);
+}
+.dark .glass-effect {
+  background-color: hsla(220, 15%, 18%, 0.85);
+  border-color: hsla(220, 10%, 30%, 0.5);
+}
+
+/* ─── Micro-animations ───────────────────────────────── */
+.hover-lift {
+  @apply transition-transform duration-300 hover:-translate-y-0.5 active:translate-y-0;
+}
+
+/* ─── Custom Scrollbar ───────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-brand-4/50 rounded-full hover:bg-brand-4;
+}
+
+/* ─── Surface tokens usados por componentes ──────────── */
+.surface {
+  background-color: var(--surface);
+}
+.border-token {
+  border-color: var(--border);
+}
+
+/* ─── Focus visible global (WCAG 2.1 AA) ────────────── */
+:focus-visible {
+  outline: 2px solid hsl(11, 88%, 61%);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

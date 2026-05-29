@@ -1,0 +1,8 @@
+// TipTap e extensões principais para editor WYSIWYG
+"@tiptap/react": "^2.0.0-beta.273",
+"@tiptap/starter-kit": "^2.0.0-beta.273",
+"@tiptap/extension-bold": "^2.0.0-beta.273",
+"@tiptap/extension-italic": "^2.0.0-beta.273",
+"@tiptap/extension-underline": "^2.0.0-beta.273",
+"@tiptap/extension-link": "^2.0.0-beta.273",
+"@tiptap/extension-image": "^2.0.0-beta.273"
