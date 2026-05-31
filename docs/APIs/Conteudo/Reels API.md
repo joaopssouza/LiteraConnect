@@ -5,7 +5,7 @@ Responsável por alimentar o feed de vídeos curtos (estilo TikTok) da plataform
 ## Segurança e Performance
 - 🔒 **Protegida:** Sim (JWT obrigatório).
 - 🚀 **Server Cache:** Cache com TTL de 15 segundos para a primeira página e 7 segundos para páginas subsequentes (paginação).
-- ⚡ **Otimização de Vídeo:** A API retorna metadados que são processados no frontend para garantir codecs compatíveis (H.264) e bitrates otimizados via Cloudinary.
+- ⚡ **Otimização de Vídeo:** A API retorna metadados que são processados no frontend para garantir codecs compatíveis (H.264) e exibição fluida.
 
 ---
 

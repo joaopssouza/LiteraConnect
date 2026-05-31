@@ -1,6 +1,6 @@
 # Avatar API (`/api/avatar`)
 
-Diferente de rotas que fazem upload de imagem, esta API é um **Gerador Dinâmico** de avatares SVG baseados nas iniciais do usuário. Funciona como um fallback rápido e leve (sem consultar banco) para quando o usuário não possui uma foto no Cloudinary.
+Diferente de rotas que fazem upload de imagem, esta API é um **Gerador Dinâmico** de avatares SVG baseados nas iniciais do usuário. Funciona como um fallback rápido e leve (sem consultar banco) para quando o usuário não possui uma foto no Supabase Storage.
 
 ## 1. Gerar SVG Dinâmico
 - **Método:** `GET`

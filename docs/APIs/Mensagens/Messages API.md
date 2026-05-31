@@ -31,7 +31,7 @@ Retorna o array de mensagens e informa quando foi a última vez que o usuário l
 {
   "conversationId": "uuid",
   "content": "Texto da mensagem",
-  "attachmentUrl": "URL do cloudinary (opcional)"
+  "attachmentUrl": "URL do Supabase Storage (opcional)"
 }
 ```
 

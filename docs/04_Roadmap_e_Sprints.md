@@ -15,7 +15,7 @@ Este é o plano de entrega do LiteraConnect, atualizado para refletir a nossa ar
 - [x] ✅ **Sprint 1 — Feed de Alta Performance:** `hooks/useFeed.ts` com Intersection Observer ([[Feed API]]), cache Redis TTL 15-30s, `POST /api/posts` seguro ([[Posts API]]), `POST /api/posts/views` via Redis INCR.
 - [x] ✅ **Sprint 2 — Explorar & Busca Global:** `hooks/useSearch.ts` com debounce 400ms, filtros de período e ordenação, carousel trending com Link navegável, [[Search API]] com sanitização e suporte a filtros.
 - [x] ✅ **Sprint 7 — Editorial (Polyglot):** [[Drafts API]] CRUD completo (GET/POST/PUT/DELETE) no MongoDB, [[Posts API]] com fluxo Draft→post_contents (MongoDB) + metadados (Supabase) + invalidação de cache Redis. `invalidateFeedCache` adicionado ao `lib/redis.ts`.
-- [x] ✅ **Sprint 9 — Reels (Vídeos Curtos):** Feed vertical estilo TikTok com autoplay, infinito e scroll snapping. Studio de criação de reels integrado com upload otimizado via Cloudinary e likes otimistas via Supabase. **Compatibilidade Desktop (H.264) e Bitrate dinâmico implementados!**
+- [x] ✅ **Sprint 9 — Reels (Vídeos Curtos):** Feed vertical estilo TikTok com autoplay, infinito e scroll snapping. Studio de criação de reels integrado com upload otimizado via Supabase Storage e likes otimistas via Supabase. **Compatibilidade Desktop (H.264) e Bitrate dinâmico implementados!**
 
 ## Fase 3: Interação Social, Perfil e Realtime
 - [x] ✅ **Sprint 3 — Activity & Notificações:** JWT em todas as rotas, [[Activity API]] (mark-as-read), log de snapshot no MongoDB (`activity_logs`), agrupamento por dia na UI, Supabase Realtime mantido.
@@ -50,7 +50,7 @@ Este é o plano de entrega do LiteraConnect, atualizado para refletir a nossa ar
     - **OAuth Google:** Botão "Continuar com Google" no `LoginClient` via `supabase.auth.signInWithOAuth`, separador visual "ou continue com".
     - **(Pendente)** Notificações Push (Web Push API + VAPID keys).
 - [x] ✅ **Sprint 16.1 — Mensagens Avançadas (Pendentes da S16):**
-    - **Anexos via Cloudinary:** `POST /api/chat/upload` com validação de tipo (image/audio/video), limite por tipo (10/5/30MB), rate limit 20 req/min, upload para pasta `chat_attachments`.
+    - **Anexos via Supabase Storage:** `POST /api/chat/upload` com validação de tipo (image/audio/video), limite por tipo (10/5/30MB), rate limit 20 req/min, upload para pasta `chat_attachments`.
     - **Cache IndexedDB:** Hook `useOfflineMessages` para persistência de mensagens pendentes, com `saveMessage`, `getPending`, `markSent`, `markFailed` e `clearSent`.
     - **(Pendente)** Integração UI do anexo no ChatInput + mensagens de voz.
 - [x] ✅ **Sprint 13 — Monetização & Engajamento:**
@@ -59,6 +59,3 @@ Este é o plano de entrega do LiteraConnect, atualizado para refletir a nossa ar
     - **(Pendente)** Sistema de gorjetas (Stripe) e posts exclusivos/premium.
 ---
 *Voltar para: [[00_LiteraConnect_Home]]*
-
-nnect_Home]]*
-

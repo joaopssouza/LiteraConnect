@@ -23,7 +23,7 @@ A aplicação não depende de um único banco de dados monolítico.
 - **Uso:** Cache de feeds (TTL curto), contadores de visualização de alta frequência (usando **INCR simples** com TTL para otimizar a memória no Free Tier) e Rate Limiting. Essencial para mascarar a latência de rede em arquiteturas Cloud.
 
 ## Infraestrutura de Mídia e Comunicação
-- **Cloudinary:** Responsável pelo upload, otimização e entrega via CDN de avatares, capas de livros e imagens.
+- **Supabase Storage:** Responsável pelo armazenamento e entrega de avatares, capas de livros, imagens e vídeos (Reels). Integrado nativamente ao ecossistema da aplicação.
 - **Resend:** Plataforma de **E-mail Transactional** utilizada via **Custom SMTP** integrado ao Supabase Auth. Garante alta entregabilidade para notificações críticas, boas-vindas e recuperação de conta, superando as limitações de cota do provedor padrão.
 
 ---

@@ -7,11 +7,13 @@
 -- que normalmente não é acessível ao usuário padrão. O `set search_path = ''` 
 -- é uma medida de segurança recomendada pelo Supabase.
 
+DROP FUNCTION IF EXISTS public.get_user_sessions();
+
 CREATE OR REPLACE FUNCTION public.get_user_sessions()
 RETURNS TABLE (
   id uuid,
   user_agent text,
-  ip text,
+  ip inet,
   created_at timestamptz,
   updated_at timestamptz
 ) 

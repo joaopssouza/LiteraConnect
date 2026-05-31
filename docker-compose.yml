@@ -1,27 +1,16 @@
 # ============================================================
 # LiteraConnect — Docker Compose (Self-Hosted)
 # Testado em: Docker 25+, Compose v2
-#
-# Redes:
-#   db_network    → Interna, sem acesso externo. Todos os dados aqui.
-#   proxy_network → Bridge compartilhada com o Nginx Proxy Manager.
-#                   Somente o container Next.js está nessa rede.
-#
-# Para subir: docker compose up -d
-# Para rebuild do Next.js: docker compose up -d --build nextjs
 # ============================================================
 
 networks:
   db_network:
     name: db_network
-    external: true         # Rede já existente no servidor — não gerenciada pelo Compose
+    external: true
   proxy_network:
     name: proxy_network
-    external: true         # Criada pelo Nginx Proxy Manager — deve existir antes
+    external: true
 
-# ============================================================
-# VOLUMES — todos no NVMe Docker isolado
-# ============================================================
 volumes:
   supabase_db_data:
   supabase_storage_data:
@@ -29,9 +18,13 @@ volumes:
   mongo_data:
   mongo_config:
 
-# ============================================================
-# SERVIÇOS
-# ============================================================
+# Configuração global de logs para evitar estouro de disco
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   # ----------------------------------------------------------
@@ -41,8 +34,14 @@ services:
     image: supabase/postgres:15.8.1.049
     container_name: supabase_db
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.50'
     environment:
       POSTGRES_HOST: /var/run/postgresql
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
@@ -55,23 +54,31 @@ services:
       - ./database.sql:/docker-entrypoint-initdb.d/zz-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -h 127.0.0.1 -p 5432"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 60s
+      retries: 5
 
   # ----------------------------------------------------------
   # SUPABASE — Kong (API Gateway)
-  # Ponto de entrada unificado para Auth, REST, Storage, Realtime
   # ----------------------------------------------------------
   supabase_kong:
     image: kong:3.9.1
     container_name: supabase_kong
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
       - proxy_network
+    ports:
+      - "8010:8000"
+      - "8443:8443"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.30'
     environment:
+      KONG_NGINX_HTTP_LARGE_CLIENT_HEADER_BUFFERS: 4 64k
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
       KONG_DNS_ORDER: LAST,A,CNAME
@@ -85,9 +92,9 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "kong", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 15s
+      timeout: 10s
+      retries: 3
 
   # ----------------------------------------------------------
   # SUPABASE — GoTrue (Autenticação)
@@ -96,9 +103,15 @@ services:
     image: supabase/gotrue:v2.186.0
     container_name: supabase_auth
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
       - proxy_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.20'
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
@@ -132,6 +145,11 @@ services:
     depends_on:
       supabase_db:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # ----------------------------------------------------------
   # SUPABASE — PostgREST (API REST automática do Postgres)
@@ -140,8 +158,14 @@ services:
     image: postgrest/postgrest:latest
     container_name: supabase_rest
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.20'
     environment:
       PGRST_DB_URI: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@supabase_db:5432/${POSTGRES_DB:-postgres}
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS:-public,storage,graphql_public}
@@ -155,22 +179,27 @@ services:
         condition: service_started
 
   # ----------------------------------------------------------
-  # SUPABASE — Storage (substitui Cloudinary)
-  # Armazena arquivos no NVMe via volume Docker
+  # SUPABASE — Storage
   # ----------------------------------------------------------
   supabase_storage:
     image: supabase/storage-api:latest
     container_name: supabase_storage
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.30'
     environment:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       POSTGREST_URL: http://supabase_rest:3000
       PGRST_JWT_SECRET: ${JWT_SECRET}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@supabase_db:5432/${POSTGRES_DB:-postgres}
-      FILE_SIZE_LIMIT: ${STORAGE_FILE_SIZE_LIMIT:-524288000}  # 500MB
+      FILE_SIZE_LIMIT: ${STORAGE_FILE_SIZE_LIMIT:-524288000}
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
       TENANT_ID: ${TENANT_ID:-literaconnect}
@@ -189,15 +218,20 @@ services:
         condition: service_started
 
   # ----------------------------------------------------------
-  # SUPABASE — Imgproxy (transformação de imagens on-the-fly)
-  # Redimensiona e otimiza imagens servidas pelo Storage
+  # SUPABASE — Imgproxy
   # ----------------------------------------------------------
   supabase_imgproxy:
     image: darthsim/imgproxy:v3.8.0
     container_name: supabase_imgproxy
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
     environment:
       IMGPROXY_BIND: ":5001"
       IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
@@ -207,7 +241,7 @@ services:
       - supabase_storage_data:/var/lib/storage:ro
     healthcheck:
       test: ["CMD", "imgproxy", "health"]
-      interval: 10s
+      interval: 20s
       timeout: 5s
       retries: 3
 
@@ -218,8 +252,14 @@ services:
     image: supabase/realtime:latest
     container_name: supabase_realtime
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.40'
     environment:
       PORT: 4000
       DB_HOST: supabase_db
@@ -243,17 +283,25 @@ services:
         condition: service_started
 
   # ----------------------------------------------------------
-  # SUPABASE — Studio (Painel Admin — opcional, apenas interno)
-  # Acesse via SSH tunnel: ssh -L 3001:localhost:3001 user@servidor
+  # SUPABASE — Studio
   # ----------------------------------------------------------
   supabase_studio:
     image: supabase/studio:latest
     container_name: supabase_studio
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
       - proxy_network
+    ports:
+      - "3001:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.30'
     environment:
+      HOSTNAME: 0.0.0.0
       STUDIO_PG_META_URL: http://supabase_meta:8080
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION:-LiteraConnect}
@@ -266,16 +314,26 @@ services:
     depends_on:
       supabase_meta:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/profile"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # ----------------------------------------------------------
-  # SUPABASE — pg-meta (metadata do PostgreSQL para o Studio)
+  # SUPABASE — pg-meta
   # ----------------------------------------------------------
   supabase_meta:
     image: supabase/postgres-meta:v0.86.0
     container_name: supabase_meta
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     environment:
       PG_META_PORT: 8080
       PG_META_DB_HOST: supabase_db
@@ -288,21 +346,26 @@ services:
         condition: service_started
 
   # ----------------------------------------------------------
-  # REDIS — Cache e Rate Limiting
-  # Persistência RDB no NVMe, sem senha (isolado na db_network)
+  # REDIS
   # ----------------------------------------------------------
   redis:
     image: redis:7-alpine
     container_name: redis
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.20'
     command: >
       redis-server
       --save 60 1
       --save 300 10
       --loglevel warning
-      --maxmemory 512mb
+      --maxmemory 128mb
       --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
@@ -313,14 +376,20 @@ services:
       retries: 5
 
   # ----------------------------------------------------------
-  # MONGODB — Auditoria e logs de jobs (cron_logs, etc.)
+  # MONGODB
   # ----------------------------------------------------------
   mongo:
     image: mongo:7
     container_name: mongo
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.40'
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-admin}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -330,22 +399,26 @@ services:
       - mongo_config:/data/configdb
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.runCommand({ ping: 1 })"]
-      interval: 15s
+      interval: 30s
       timeout: 10s
-      retries: 5
+      retries: 3
       start_period: 30s
 
   # ----------------------------------------------------------
-  # MONGO EXPRESS — Painel Admin MongoDB (apenas interno)
-  # Acesse via SSH tunnel: ssh -L 8081:localhost:8081 user@servidor
+  # MONGO EXPRESS
   # ----------------------------------------------------------
   mongo_express:
     image: mongo-express:1.0.2
     container_name: mongo_express
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
       - proxy_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USER:-admin}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -358,7 +431,6 @@ services:
 
   # ----------------------------------------------------------
   # NEXT.JS — Aplicação LiteraConnect
-  # Única a ter acesso à proxy_network (Nginx Proxy Manager)
   # ----------------------------------------------------------
   nextjs:
     build:
@@ -371,9 +443,15 @@ services:
         SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
     container_name: nextjs
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
-      - proxy_network      # Exposto ao NPM para receber tráfego externo
+      - proxy_network
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '0.80'
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
@@ -395,15 +473,19 @@ services:
         condition: service_started
 
   # ----------------------------------------------------------
-  # OFELIA — Docker-native Cron Job Scheduler
-  # Substitui o Vercel Cron. Dispara /api/cron/consolidate-views a cada 6h.
+  # OFELIA
   # ----------------------------------------------------------
   ofelia:
     image: mcuadros/ofelia:latest
     container_name: ofelia
     restart: unless-stopped
+    logging: *default-logging
     networks:
       - db_network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     depends_on:
       - nextjs
     volumes:

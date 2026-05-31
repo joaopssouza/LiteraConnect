@@ -37,6 +37,18 @@ export default function LoginClient() {
     setLoading(true);
     setError(null);
     try {
+      // OTIMIZAÇÃO: Limpar cookies e local storage antigos ANTES de iniciar um novo fluxo OAuth.
+      // Isso previne o acúmulo de 'lixo' de identidades que causa o Erro 431 (Headers Too Large) nos WebSockets.
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+        sessionStorage.clear();
+        document.cookie.split(";").forEach((c) => {
+          document.cookie = c
+            .replace(/^ +/, "")
+            .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

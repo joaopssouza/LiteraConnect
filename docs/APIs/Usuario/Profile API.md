@@ -44,7 +44,7 @@ Responsável pela atualização dos dados básicos e identificadores únicos de 
 ### Body (JSON)
 ```json
 {
-  "avatar_url": "https://res.cloudinary.com/..."
+  "avatar_url": "https://[project_ref].supabase.co/storage/v1/object/public/..."
 }
 ```
 

@@ -29,6 +29,10 @@ const nextConfig: NextConfig = {
         hostname: 'literaconnect.jpdev.uk',
       },
       {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
         protocol: 'http',
         hostname: 'localhost',
       },

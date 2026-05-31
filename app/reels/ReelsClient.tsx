@@ -30,10 +30,10 @@ interface Reel {
 }
 
 /**
- * Como a otimização de vídeo agora é feita no momento do upload (Incoming Transformation)
- * pelo Preset do Cloudinary, esta função serve apenas como uma camada de segurança extra
- * para garantir que a URL final possua a extensão .mp4 para máxima compatibilidade 
- * com os navegadores.
+ * Função utilitária para garantir compatibilidade da URL do vídeo.
+ * Como o LiteraConnect agora utiliza Supabase Storage, os vídeos são 
+ * servidos diretamente. Esta função permanece como um placeholder para 
+ * futuras transformações se necessário.
  */
 function getCompatibleVideoUrl(url: string): string {
   return url;
