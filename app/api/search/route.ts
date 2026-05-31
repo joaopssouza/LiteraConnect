@@ -39,8 +39,8 @@ export async function GET(request: Request) {
       let searchQuery = supabase
         .from('posts')
         .select(
-          `id, user_id, content, book_title, book_cover_url, created_at,
-          author:users (name, handle, avatar_url),
+          `id, user_id, content, book_title, book_cover_url, video_url, media, created_at,
+          author:users!posts_user_id_fkey(name, handle, avatar_url),
           likes(count),
           comments(count)`
         )
@@ -55,37 +55,37 @@ export async function GET(request: Request) {
       // Filtro de texto
       if (q) searchQuery = searchQuery.or(`content.ilike.%${q}%,book_title.ilike.%${q}%`);
 
-      // Ordenação
-      if (sort === 'popular') {
-        searchQuery = searchQuery.order('count', { foreignTable: 'likes', ascending: false });
-      } else {
-        searchQuery = searchQuery.order('created_at', { ascending: false });
-      }
+      // Ordenação segura (usando created_at como fallback para popularidade por enquanto)
+      searchQuery = searchQuery.order('created_at', { ascending: false });
 
-      const { data: results, error } = await searchQuery;
-      if (error) throw error;
+      const { data: results, error: searchError } = await searchQuery;
+      if (searchError) throw searchError;
 
       const normalizedResults = (results || []).map((post: any) => ({
         ...post,
         likes_count: post.likes?.[0]?.count ?? 0,
         comments_count: post.comments?.[0]?.count ?? 0,
+        views: 0, // Fallback
+        shares: 0  // Fallback
       }));
 
-      // --- Trending: top curtidos nos últimos 14 dias ---
+      // --- Trending: posts recentes dos últimos 14 dias ---
       const { data: trendingData, error: trendingError } = await supabase
         .from('posts')
         .select(
-          `id, user_id, content, book_title, book_cover_url, created_at,
-          author:users (name, handle, avatar_url),
+          `id, user_id, content, book_title, book_cover_url, video_url, media, created_at,
+          author:users!posts_user_id_fkey(name, handle, avatar_url),
           likes(count)`
         )
         .eq('status', 'published')
         .eq('visibility', 'public')
         .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
-        .order('count', { foreignTable: 'likes', ascending: false })
+        .order('created_at', { ascending: false })
         .limit(10);
 
-      if (trendingError) throw trendingError;
+      if (trendingError) {
+        console.error('Erro ao buscar trending:', trendingError);
+      }
 
       const trending = (trendingData || []).map((post: any) => ({
         ...post,

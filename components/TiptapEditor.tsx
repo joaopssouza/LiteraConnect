@@ -1,198 +1,94 @@
 'use client';
 
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Bold from '@tiptap/extension-bold';
-import Italic from '@tiptap/extension-italic';
 import Underline from '@tiptap/extension-underline';
-import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
-import { uploadToStorage } from '@/lib/storage';
-import { BoldIcon, ItalicIcon, UnderlineIcon, Heading1, Heading2, ImageIcon, LinkIcon, List, Quote } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import Link from '@tiptap/extension-link';
+import { useRef } from 'react';
+import {
+  Bold, Italic, Underline as UnderlineIcon,
+  Quote, List, ListOrdered, ImageIcon, Link2,
+} from 'lucide-react';
+import { uploadMedia } from '@/lib/supabase-storage';
+import { cn } from '@/lib/utils';
 
-export default function TiptapEditor({ 
-  content, 
-  onChange 
-}: { 
-  content: string; 
+interface TiptapEditorProps {
+  content: string;
   onChange: (html: string) => void;
-}) {
-  const [isUploading, setIsUploading] = useState(false);
+}
 
-  const handleImageUpload = useCallback(async (file: File, editor: any) => {
-    try {
-      setIsUploading(true);
-      const url = await uploadToStorage(file, 'post-images');
-      editor.chain().focus().setImage({ src: url }).run();
-    } catch (error) {
-      console.error('Failed to upload image', error);
-      alert('Erro ao enviar imagem.');
-    } finally {
-      setIsUploading(false);
-    }
-  }, []);
+const ToolbarBtn = ({
+  onClick,
+  active,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  active?: boolean;
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    title={title}
+    onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+    className={cn(
+      'p-2 rounded-lg transition-all',
+      active
+        ? 'bg-brand-2 text-white shadow-sm'
+        : 'text-[var(--text-main)]/60 hover:text-[var(--text-main)] hover:bg-[var(--border)]/40',
+    )}
+  >
+    {children}
+  </button>
+);
 
+export default function TiptapEditor({ content, onChange }: TiptapEditorProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Bold,
-      Italic,
-      Underline,
-      Link.configure({ openOnClick: false }),
-      Image.configure({ inline: true }),
+      StarterKit.configure({
+        // Desabilita extensões que não queremos expor ao usuário
+        code: false,
+        codeBlock: false,
+        horizontalRule: false,
+        strike: false,
+        bold: false,
+        italic: false,
+        blockquote: false,
+        heading: {
+          // Permite apenas H2 e H3 (via atalho), mas não exporemos botão
+          levels: [2, 3],
+        },
+      }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          class: 'text-brand-2 underline hover:opacity-80 transition-opacity',
+          rel: 'noopener noreferrer nofollow',
+          target: '_blank',
+        },
+      }),
     ],
     content,
     editorProps: {
       attributes: {
-        class: 'prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[400px] text-[var(--text-main)]',
-      }
+        class:
+          'min-h-[200px] outline-none text-[var(--text-main)] leading-relaxed text-lg prose prose-invert max-w-none focus:outline-none',
+      },
     },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
+    immediatelyRender: false,
   });
 
-  const addImage = () => {
-    if (!editor) return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async () => {
-      if (input.files?.length) {
-        await handleImageUpload(input.files[0], editor);
-      }
-    };
-    input.click();
-  };
-
-  const setLink = useCallback(() => {
-    if (!editor) return;
-    const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('URL', previousUrl);
-    if (url === null) return;
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
-    }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-  }, [editor]);
-
-  if (!editor) {
-    return <div className="min-h-[400px] flex items-center justify-center text-[var(--text-main)]/40 font-medium">Carregando Editor...</div>;
-  }
+  if (!editor) return null;
 
   return (
-    <div className="w-full flex flex-col border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--surface)] shadow-2xl transition-colors">
-      
-      {/* Menu Principal (Toolbar) */}
-      <div className="flex flex-wrap items-center gap-1.5 p-3 border-b border-[var(--border)] bg-[var(--surface)] text-[var(--text-main)]/60 shrink-0">
-        <button
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`p-2 rounded-lg hover:bg-[var(--border)] transition-all ${editor.isActive('bold') ? 'bg-[var(--border)] text-brand-2 shadow-sm' : ''}`}
-          title="Negrito"
-        >
-          <BoldIcon size={20} />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`p-2 rounded-lg hover:bg-[var(--border)] transition-all ${editor.isActive('italic') ? 'bg-[var(--border)] text-brand-2 shadow-sm' : ''}`}
-          title="Itálico"
-        >
-          <ItalicIcon size={20} />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className={`p-2 rounded-lg hover:bg-[var(--border)] transition-all ${editor.isActive('underline') ? 'bg-[var(--border)] text-brand-2 shadow-sm' : ''}`}
-          title="Sublinhado"
-        >
-          <UnderlineIcon size={20} />
-        </button>
-
-        <div className="w-px h-6 bg-[var(--border)] mx-1" />
-
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`p-2 rounded-lg hover:bg-[var(--border)] transition-all ${editor.isActive('heading', { level: 1 }) ? 'bg-[var(--border)] text-brand-2 shadow-sm' : ''}`}
-          title="Título 1"
-        >
-          <Heading1 size={20} />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`p-2 rounded-lg hover:bg-[var(--border)] transition-all ${editor.isActive('heading', { level: 2 }) ? 'bg-[var(--border)] text-brand-2 shadow-sm' : ''}`}
-          title="Título 2"
-        >
-          <Heading2 size={20} />
-        </button>
-        
-        <div className="w-px h-6 bg-[var(--border)] mx-1" />
-
-        <button
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`p-2 rounded-lg hover:bg-[var(--border)] transition-all ${editor.isActive('bulletList') ? 'bg-[var(--border)] text-brand-2 shadow-sm' : ''}`}
-          title="Lista"
-        >
-          <List size={20} />
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-          className={`p-2 rounded-lg hover:bg-[var(--border)] transition-all ${editor.isActive('blockquote') ? 'bg-[var(--border)] text-brand-2 shadow-sm' : ''}`}
-          title="Citação"
-        >
-          <Quote size={20} />
-        </button>
-        
-        <div className="w-px h-6 bg-[var(--border)] mx-1" />
-
-        <button
-          onClick={setLink}
-          className={`p-2 rounded-lg hover:bg-[var(--border)] transition-all ${editor.isActive('link') ? 'bg-[var(--border)] text-brand-2 shadow-sm' : ''}`}
-          title="Adicionar Link"
-        >
-          <LinkIcon size={20} />
-        </button>
-
-        <button
-          onClick={addImage}
-          disabled={isUploading}
-          className="px-4 py-2 disabled:opacity-50 rounded-xl hover:bg-brand-2 hover:text-white transition-all ml-auto flex items-center gap-2 text-sm font-bold border border-transparent hover:shadow-lg"
-          title="Upload Imagem"
-        >
-          <ImageIcon size={18} /> <span className="hidden sm:inline">{isUploading ? 'Enviando...' : 'Imagem'}</span>
-        </button>
-      </div>
-
-      {/* Bubble Menu */}
-      {editor && (
-        <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }} className="flex bg-[var(--bg-main)] border border-[var(--border)] text-[var(--text-main)] rounded-xl shadow-2xl overflow-hidden p-1 gap-1">
-          <button
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`p-2 rounded-lg hover:bg-[var(--border)] transition-colors ${editor.isActive('bold') ? 'text-brand-2' : ''}`}
-          >
-            <BoldIcon size={16} />
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`p-2 rounded-lg hover:bg-[var(--border)] transition-colors ${editor.isActive('italic') ? 'text-brand-2' : ''}`}
-          >
-            <ItalicIcon size={16} />
-          </button>
-          <button
-            onClick={setLink}
-            className={`p-2 rounded-lg hover:bg-[var(--border)] transition-colors ${editor.isActive('link') ? 'text-brand-2' : ''}`}
-          >
-            <LinkIcon size={16} />
-          </button>
-        </BubbleMenu>
-      )}
-
-      {/* Área de Edição */}
-      <div className="p-4 sm:p-10 bg-[var(--bg-main)] flex-1 overflow-y-auto cursor-text" onClick={() => editor.commands.focus()}>
-        <div className="max-w-4xl mx-auto bg-[var(--surface)] min-h-full p-8 sm:p-12 shadow-inner rounded-3xl border border-[var(--border)]">
-          <EditorContent editor={editor} />
-        </div>
-      </div>
+    <div className="flex flex-col gap-0">
+      {/* Área de edição sem toolbar de estilo */}
+      <EditorContent editor={editor} />
     </div>
   );
 }

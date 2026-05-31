@@ -14,11 +14,12 @@ Esta pasta documenta todas as rotas de API do LiteraConnect, agrupadas por domí
   - 📄 [[Comments API]] (`/api/comments`) — Gestão de comentários em posts.
 - 📁 **Conteúdo & Feed**
   - 📄 [[Feed API]] (`/api/feed`) — Orquestração da timeline com Redis Cache.
+  - 📄 [[Reels API]] (`/api/reels`) — Feed de vídeos verticais com cache poliglota.
   - 📄 [[Posts API]] (`/api/posts`, `/publish`, `/views`) — Criação, leitura, contagem de views.
   - 📄 [[Drafts API]] (`/api/drafts`) — Rascunhos salvos no MongoDB.
   - 📄 [[Search API]] (`/api/search`) — Busca global no MongoDB Atlas.
-- 📁 **Comunicação (Chat)**
-  - 📄 [[Conversations API]] (`/api/chat/conversations`) — Lista de conversas e não-lidos.
+- 📁 **Comunicação (Mensagens)**
+  - 📄 [[Conversations API]] (`/api/chat/conversations`) — Lista de mensagens, incluindo o link para Atividades.
   - 📄 [[Messages API]] (`/api/chat/messages`) — Envio e histórico de mensagens.
   - 📄 [[Presence API]] (`/api/chat/presence`) — Status de online/offline.
 - 📁 **Sistema & Analytics**

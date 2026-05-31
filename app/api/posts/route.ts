@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { content, book_title, book_cover_url } = body;
+    const { content, book_title, book_cover_url, post_type = 'text', video_url, media } = body;
 
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
       return NextResponse.json({ error: 'Conteúdo é obrigatório.' }, { status: 400 });
@@ -34,6 +34,9 @@ export async function POST(req: Request) {
           content: content.trim(),
           book_title: book_title?.trim() || null,
           book_cover_url: book_cover_url || null,
+          post_type,
+          video_url: video_url || null,
+          media: media || [],
           status: 'published',
           visibility: 'public',
         },

@@ -22,7 +22,7 @@ Responsável pela busca global de conteúdo na plataforma.
 ### Comportamento
 Realiza **duas consultas em paralelo**:
 1. **Busca Principal:** Pesquisa no Supabase onde o status é `published` e `visibility = public`. Se `q` for fornecido, faz `ilike` no `content` ou `book_title`.
-2. **Carousel Trending:** Independentemente do termo buscado, traz os top 10 posts mais curtidos nos últimos 14 dias para alimentar a UI exploratória lateral/topo.
+2. **Carousel Trending:** Independentemente do termo buscado, traz os top 10 posts mais curtidos nos últimos 14 dias para alimentar a UI exploratória lateral/topo. O array de dados retornado foi enriquecido com a propriedade `media`, garantindo o suporte nativo a thumbnails de vídeos curtos.
 
 ### Respostas
 - `200 OK`:

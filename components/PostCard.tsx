@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Bell, BellOff, Bookmark, EyeOff, Heart, Link2, MessageCircle, Pencil, Repeat2, Share, Shield, Trash2 } from 'lucide-react';
+import { Bell, BellOff, Bookmark, Check, Eye, EyeOff, Heart, Link2, MessageCircle, Pencil, Repeat2, Share, Shield, Trash2, X, Play } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { usePathname, useRouter } from 'next/navigation';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { queueView } from '@/lib/view-buffer';
+import { usePreferences } from '@/hooks/usePreferences';
+import { MediaViewerModal } from './MediaViewerModal';
 
 async function incrementPostShares(postId: string) {
   try {
@@ -68,6 +70,7 @@ interface PostProps {
   content: string;
   bookTitle?: string;
   bookCover?: string;
+  media?: Array<{ url: string; type: 'image' | 'video' }>;
   likes: number;
   comments: number;
   reposts: number;
@@ -77,16 +80,19 @@ interface PostProps {
   skipFetchCounts?: boolean;
   imagePriority?: boolean;
   onLocalPostPreferenceChange?: () => void;
+  recent_comments?: any[];
+  hideCommentInput?: boolean;
 }
 
-export function PostCard({ id, authorId, author, content, bookTitle, bookCover, likes: initialLikes, comments: initialComments, reposts, views, shares, timeAgo, skipFetchCounts = false, imagePriority = false, onLocalPostPreferenceChange }: PostProps) {
-  const { user } = useAuth();
+export function PostCard({ id, authorId, author, content, bookTitle, bookCover, media: initialMedia, likes: initialLikes, comments: initialComments, recent_comments, hideCommentInput = false, reposts, views, shares, timeAgo, skipFetchCounts = false, imagePriority = false, onLocalPostPreferenceChange }: PostProps) {
+  const { user, profile } = useAuth();
+  const { preferences } = usePreferences();
   const router = useRouter();
   const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const repostPreview = useMemo(() => parseRepostPreview(content), [content]);
   const isOwner = !!user && (authorId ? user.id === authorId : user.user_metadata?.handle === author.handle);
-  
+
   const [likesCount, setLikesCount] = useState(initialLikes);
   const [commentsCount, setCommentsCount] = useState(initialComments);
   const [repostsCount, setRepostsCount] = useState(reposts);
@@ -107,6 +113,146 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
   const [editBookTitle, setEditBookTitle] = useState(bookTitle || '');
   const [isSavingPost, setIsSavingPost] = useState(false);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
+
+  const [feedComments, setFeedComments] = useState<any[]>(recent_comments || []);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [feedCommentLikeLoading, setFeedCommentLikeLoading] = useState<Record<string, boolean>>({});
+  const [editingFeedCommentId, setEditingFeedCommentId] = useState<string | null>(null);
+  const [editingFeedCommentValue, setEditingFeedCommentValue] = useState('');
+  const [isSavingFeedComment, setIsSavingFeedComment] = useState(false);
+  const [isDeletingFeedCommentId, setIsDeletingFeedCommentId] = useState<string | null>(null);
+
+  const handleToggleFeedCommentLike = async (e: React.MouseEvent, commentId: string, currentLiked: boolean, currentCount: number) => {
+    e.stopPropagation();
+    if (!user || feedCommentLikeLoading[commentId]) return;
+
+    setFeedCommentLikeLoading(prev => ({ ...prev, [commentId]: true }));
+    setFeedComments(prev => prev.map(c => c.id === commentId ? {
+      ...c,
+      liked_by_me: !currentLiked,
+      likes_count: Math.max(0, currentCount + (currentLiked ? -1 : 1))
+    } : c));
+
+    try {
+      if (currentLiked) {
+        await supabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', user.id);
+      } else {
+        await supabase.from('comment_likes').insert([{ comment_id: commentId, user_id: user.id }]);
+      }
+    } catch (err) {
+      // Revertse der erro
+      setFeedComments(prev => prev.map(c => c.id === commentId ? {
+        ...c,
+        liked_by_me: currentLiked,
+        likes_count: currentCount
+      } : c));
+    } finally {
+      setFeedCommentLikeLoading(prev => ({ ...prev, [commentId]: false }));
+    }
+  };
+
+  const startEditingFeedComment = (e: React.MouseEvent, cmt: any) => {
+    e.stopPropagation();
+    setEditingFeedCommentId(cmt.id);
+    setEditingFeedCommentValue(cmt.content);
+  };
+
+  const saveFeedCommentEdit = async (e: React.MouseEvent, commentId: string) => {
+    e.stopPropagation();
+    if (!user || !editingFeedCommentValue.trim() || isSavingFeedComment) return;
+    setIsSavingFeedComment(true);
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .update({ content: editingFeedCommentValue.trim(), updated_at: new Date().toISOString() })
+        .eq('id', commentId)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      setFeedComments(prev =>
+        prev.map(c => c.id === commentId
+          ? { ...c, content: editingFeedCommentValue.trim(), updated_at: new Date().toISOString() }
+          : c
+        )
+      );
+      setEditingFeedCommentId(null);
+    } catch (err: any) {
+      openModal('Erro ao editar', err.message || 'Não foi possível salvar.');
+    } finally {
+      setIsSavingFeedComment(false);
+    }
+  };
+
+  const cancelFeedCommentEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingFeedCommentId(null);
+    setEditingFeedCommentValue('');
+  };
+
+  const deleteFeedComment = async (e: React.MouseEvent, commentId: string) => {
+    e.stopPropagation();
+    if (!user || isDeletingFeedCommentId) return;
+    setIsDeletingFeedCommentId(commentId);
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', commentId)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      setFeedComments(prev => prev.filter(c => c.id !== commentId));
+      setCommentsCount(prev => Math.max(0, prev - 1));
+    } catch (err: any) {
+      openModal('Erro ao excluir', err.message || 'Não foi possível remover.');
+    } finally {
+      setIsDeletingFeedCommentId(null);
+    }
+  };
+
+  const handleFeedCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !newComment.trim() || isSubmittingComment) return;
+    setIsSubmittingComment(true);
+    try {
+      const res = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: id, content: newComment.trim() })
+      });
+      if (!res.ok) throw new Error('Erro ao comentar');
+      const data = await res.json();
+      
+      const newCmt = {
+        id: data.comment?.id || Date.now().toString(),
+        content: newComment.trim(),
+        created_at: new Date().toISOString(),
+        author: {
+          name: profile?.name || user.user_metadata?.full_name || user.user_metadata?.name || 'Você',
+          handle: profile?.handle || user.user_metadata?.handle || 'voce',
+          avatar_url: profile?.avatar_url || user.user_metadata?.avatar_url || ''
+        }
+      };
+      setFeedComments(prev => [newCmt, ...prev].slice(0, 3));
+      setCommentsCount(prev => prev + 1);
+      setNewComment('');
+    } catch (err: any) {
+      openModal('Erro', err.message || 'Não foi possível enviar o comentário.');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const mediaList = useMemo(() => {
+    if (initialMedia && initialMedia.length > 0) return initialMedia;
+    if (bookCover) {
+      const isVideo = bookCover.match(/\.(mp4|webm|ogg|mov)$/i) || bookCover.includes('video/');
+      const url = isVideo ? (bookCover.includes('#t=') ? bookCover : `${bookCover}#t=2.0`) : bookCover;
+      return [{ url, type: isVideo ? 'video' : 'image' } as const];
+    }
+    return [];
+  }, [initialMedia, bookCover]);
+
   const [modalState, setModalState] = useState<ModalState>({
     open: false,
     title: '',
@@ -295,7 +441,7 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
         await navigator.clipboard.writeText(postUrl);
         openModal('Link copiado', 'O link foi copiado.');
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleCardClick = () => {
@@ -350,13 +496,20 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
 
     setIsDeletingPost(true);
     try {
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      const res = await fetch(`/api/posts/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Falha ao excluir o post');
+      }
 
       setIsTrashModalOpen(false);
       if (pathname === `/post/${id}`) {
@@ -375,12 +528,11 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
   if (isHidden) return null;
 
   return (
-    <article 
-      onClick={handleCardClick}
-      className="p-4 border-b border-[var(--border)] bg-[var(--surface)] hover:opacity-95 transition-opacity cursor-pointer"
+    <article
+      className="p-4 border-b border-[var(--border)] bg-[var(--surface)] hover:opacity-95 transition-opacity"
     >
       <div className="flex gap-3">
-        <div 
+        <div
           className="relative w-12 h-12 flex-shrink-0 cursor-pointer"
           onClick={handleProfileClick}
         >
@@ -394,18 +546,25 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
             unoptimized
           />
         </div>
-        <div className="flex-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[var(--text-main)] hover:underline" onClick={handleProfileClick}>
-                {author.name}
-              </span>
-              <span className="text-[var(--text-main)]/60 text-sm" onClick={handleProfileClick}>
-                @{author.handle}
-              </span>
-              <span className="text-[var(--text-main)]/60 text-sm">· {timeAgo}</span>
+        <div className="flex-1 flex flex-col justify-center">
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[var(--text-main)] hover:underline" onClick={handleProfileClick}>
+                  {author.name}
+                </span>
+                <span className="text-[var(--text-main)]/60 text-sm" onClick={handleProfileClick}>
+                  @{author.handle}
+                </span>
+                <span className="text-[var(--text-main)]/60 text-sm">· {timeAgo}</span>
+              </div>
+              {bookTitle && (
+                <div className="inline-flex items-center self-start gap-1 bg-brand-2/10 px-2 py-0.5 mt-0.5 rounded-full text-xs font-medium text-brand-2 border border-brand-2/20">
+                  📚 Lendo: {bookTitle}
+                </div>
+              )}
             </div>
-            
+
             <div className="relative" ref={menuRef}>
               <button
                 className="text-[var(--text-main)]/60 hover:text-[var(--text-main)] p-1 rounded-full hover:bg-[var(--border)]/30 transition-colors"
@@ -416,6 +575,9 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
 
               {isMenuOpen && (
                 <div className="absolute right-0 mt-2 w-64 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl z-30 py-1 overflow-hidden">
+                  <button onClick={(e) => { e.stopPropagation(); setIsMenuOpen(false); window.open(`/post/${id}`, '_blank'); }} className="w-full px-4 py-2 text-left text-sm text-[var(--text-main)] hover:bg-[var(--border)]/20 flex items-center gap-2">
+                    <Link2 className="w-4 h-4" /> Abrir post em nova guia
+                  </button>
                   <button onClick={(e) => { e.stopPropagation(); const now = toggleArrayPreference('saved-posts', id); setIsSaved(now); setIsMenuOpen(false); }} className="w-full px-4 py-2 text-left text-sm text-[var(--text-main)] hover:bg-[var(--border)]/20 flex items-center gap-2">
                     <Bookmark className="w-4 h-4" /> {isSaved ? 'Remover dos salvos' : 'Salvar post'}
                   </button>
@@ -437,14 +599,14 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
               )}
             </div>
           </div>
-          
-          {bookTitle && (
-            <div className="mt-1 mb-2 inline-flex items-center gap-2 bg-brand-2/10 px-3 py-1 rounded-full text-sm font-medium text-brand-2 border border-brand-2/20">
-              📚 Lendo: {bookTitle}
-            </div>
-          )}
+        </div>
+      </div>
 
-          <div className="mt-2 text-[var(--text-main)] whitespace-pre-wrap leading-relaxed">
+      <div className="mt-2">
+          <div
+            className="mt-2 text-[var(--text-main)] whitespace-pre-wrap leading-relaxed transition-all relative"
+            style={{ fontSize: preferences?.fontSize ? `${preferences.fontSize}px` : '16px' }}
+          >
             {repostPreview ? (
               <>
                 {repostPreview.comment && <p className="mb-2">{repostPreview.comment}</p>}
@@ -461,9 +623,50 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
             ) : content}
           </div>
 
-          {bookCover && !repostPreview && (
-            <div className="mt-3 rounded-2xl overflow-hidden border border-[var(--border)] relative w-full aspect-[16/9] bg-[var(--border)]/10">
-              <Image src={bookCover} alt="Capa" fill className="object-cover" unoptimized priority={imagePriority} />
+          {mediaList.length > 0 && !repostPreview && (
+            <div 
+              className={cn(
+                "mt-3 rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--border)]/5 grid gap-1",
+                mediaList.length === 1 ? "grid-cols-1" : "grid-cols-2"
+              )}
+            >
+              {mediaList.map((item, idx) => (
+                <div 
+                  key={idx} 
+                  onClick={(e) => { e.stopPropagation(); setSelectedMediaIndex(idx); }}
+                  className={cn(
+                    "relative cursor-pointer bg-black flex items-center justify-center overflow-hidden",
+                    mediaList.length === 1 ? "aspect-auto max-h-[500px]" : "aspect-square",
+                    mediaList.length === 3 && idx === 0 ? "row-span-2 h-full" : ""
+                  )}
+                >
+                  {item.type === 'video' ? (
+                    <div className="relative w-full h-full group">
+                      <video
+                        src={item.url.includes('#t=') ? item.url : `${item.url}#t=2.0`}
+                        className="w-full h-full object-contain opacity-80"
+                        controls={mediaList.length === 1}
+                        controlsList="nodownload"
+                        playsInline
+                        preload="metadata"
+                      />
+                      {mediaList.length > 1 && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:bg-black/20 transition-colors">
+                          <div className="bg-black/50 backdrop-blur-md p-3 rounded-full border border-white/20">
+                            <Play className="w-8 h-8 text-white fill-current" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <img 
+                      src={item.url} 
+                      alt="" 
+                      className="w-full h-full object-contain transition-transform duration-500" 
+                    />
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
@@ -474,6 +677,16 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
               </div>
               <span className="text-sm">{likesCount}</span>
             </button>
+            <span className="flex items-center gap-1.5 text-[var(--text-main)]/40 select-none">
+              <Eye className="w-4 h-4" />
+              <span className="text-sm">
+                {((v) => v >= 1000000
+                  ? `${(v / 1000000).toFixed(1)}M`
+                  : v >= 1000
+                  ? `${(v / 1000).toFixed(1)}K`
+                  : v)(views ?? 0)}
+              </span>
+            </span>
             <button className="flex items-center gap-2 hover:text-brand-2 transition-colors">
               <div className="p-2 rounded-full hover:bg-brand-2/10">
                 <MessageCircle className="w-5 h-5" />
@@ -492,8 +705,164 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
               </div>
             </button>
           </div>
+
+          {/* Comentários compactos e campo de input para todos os posts */}
+          <div className="mt-4 border-t border-[var(--border)] pt-3">
+              {feedComments && feedComments.length > 0 && (
+                <div className="space-y-2 mb-3">
+                  {feedComments.map(cmt => {
+                    const isOwnerCmt = user?.id === cmt.user_id;
+                    const isEditingThis = editingFeedCommentId === cmt.id;
+                    const wasEdited = !!cmt.updated_at;
+                    return (
+                      <div key={cmt.id} className="flex flex-col gap-1 group/cmt">
+                        <div className="flex gap-2 text-sm items-start">
+                          <div
+                            className="w-6 h-6 relative flex-shrink-0 mt-0.5 cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); window.open(`/post/${id}`, '_blank'); }}
+                          >
+                            <Image
+                              src={resolveAvatarUrl(cmt.author?.avatar_url, cmt.author?.handle, 50)}
+                              alt=""
+                              fill
+                              className="rounded-full object-cover"
+                              unoptimized
+                            />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            {isEditingThis ? (
+                              <div
+                                className="bg-[var(--text-main)]/10 rounded-xl px-3 py-1.5"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <span className="font-bold text-[var(--text-main)] mr-2 text-xs">{cmt.author?.handle}</span>
+                                <input
+                                  autoFocus
+                                  value={editingFeedCommentValue}
+                                  onChange={e => setEditingFeedCommentValue(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Escape') cancelFeedCommentEdit(e as any); }}
+                                  className="w-full bg-transparent outline-none text-sm text-[var(--text-main)] mt-0.5"
+                                />
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  <button
+                                    onClick={e => saveFeedCommentEdit(e, cmt.id)}
+                                    disabled={isSavingFeedComment || !editingFeedCommentValue.trim()}
+                                    className="flex items-center gap-1 text-xs font-bold text-brand-2 hover:opacity-80 disabled:opacity-40 transition-opacity"
+                                  >
+                                    <Check className="w-3 h-3" /> Salvar
+                                  </button>
+                                  <button
+                                    onClick={cancelFeedCommentEdit}
+                                    className="text-xs text-[var(--text-main)]/50 hover:text-[var(--text-main)] transition-colors"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                className="bg-[var(--text-main)]/10 rounded-xl px-3 py-1.5 cursor-pointer"
+                                onClick={(e) => { e.stopPropagation(); window.open(`/post/${id}`, '_blank'); }}
+                              >
+                                <span className="font-bold text-[var(--text-main)] mr-1.5">{cmt.author?.handle}</span>
+                                {wasEdited && (
+                                  <span className="text-[0.65rem] text-[var(--text-main)]/40 font-medium mr-1.5 align-middle">· editado</span>
+                                )}
+                                <span className="text-[var(--text-main)]/80">{cmt.content}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Ações: like + editar/deletar */}
+                          <div className="flex items-center gap-0.5 ml-1 mt-0.5 flex-shrink-0">
+                            <div className="flex flex-col items-center">
+                              <button
+                                onClick={(e) => handleToggleFeedCommentLike(e, cmt.id, cmt.liked_by_me, cmt.likes_count)}
+                                className="p-1.5 rounded-full hover:bg-[var(--border)]/20 transition-colors"
+                              >
+                                <Heart className={cn("w-4 h-4", cmt.liked_by_me ? "fill-brand-2 text-brand-2" : "text-[var(--text-main)]/60")} />
+                              </button>
+                              {cmt.likes_count > 0 && (
+                                <span className="text-xs text-[var(--text-main)]/60 -mt-1 font-medium">{cmt.likes_count}</span>
+                              )}
+                            </div>
+                            {isOwnerCmt && !isEditingThis && (
+                              <>
+                                <button
+                                  title="Editar"
+                                  onClick={e => startEditingFeedComment(e, cmt)}
+                                  className="p-1.5 rounded-full hover:bg-[var(--border)]/20 transition-colors opacity-0 group-hover/cmt:opacity-100"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-[var(--text-main)]/50 hover:text-brand-2" />
+                                </button>
+                                <button
+                                  title="Excluir"
+                                  onClick={e => deleteFeedComment(e, cmt.id)}
+                                  disabled={isDeletingFeedCommentId === cmt.id}
+                                  className="p-1.5 rounded-full hover:bg-red-500/10 transition-colors opacity-0 group-hover/cmt:opacity-100"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-[var(--text-main)]/50 hover:text-red-500" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {cmt.replies_count > 0 && (
+                          <div className="pl-9 -mt-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); window.open(`/post/${id}`, '_blank'); }}
+                              className="text-xs text-[var(--text-main)]/50 font-medium hover:underline flex items-center gap-1"
+                            >
+                              <div className="w-4 border-t border-[var(--text-main)]/30 inline-block mr-1"></div>
+                              {cmt.replies_count === 1 ? '1 resposta' : `${cmt.replies_count} respostas`}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {commentsCount > feedComments.length && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); router.push(`/post/${id}`); }}
+                      className="text-xs text-brand-2 hover:underline pl-9 font-medium"
+                    >
+                      Ver todos os {commentsCount} comentários
+                    </button>
+                  )}
+                </div>
+              )}
+              {!hideCommentInput && user && (
+                <form onSubmit={handleFeedCommentSubmit} onClick={e => e.stopPropagation()} className="flex items-center gap-2">
+                  <div className="w-6 h-6 relative flex-shrink-0 bg-[var(--border)]/20 rounded-full overflow-hidden">
+                    <Image
+                      src={resolveAvatarUrl(profile?.avatar_url || user.user_metadata?.avatar_url, profile?.handle || user.user_metadata?.handle, 50)}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                  <input 
+                    type="text" 
+                    value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    placeholder="Escreva um comentário..."
+                    className="flex-1 bg-[var(--text-main)]/10 rounded-full px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-brand-2/50 placeholder:text-[var(--text-main)]/40 text-[var(--text-main)]"
+                    disabled={isSubmittingComment}
+                  />
+                  <button 
+                    type="submit"
+                    disabled={!newComment.trim() || isSubmittingComment}
+                    className="text-brand-2 font-bold text-sm disabled:opacity-40 pr-1"
+                  >
+                    Enviar
+                  </button>
+                </form>
+              )}
+            </div>
         </div>
-      </div>
 
       {/* Modais com o novo design */}
       {(isRepostModalOpen || isEditPostModalOpen || isTrashModalOpen || modalState.open) && (
@@ -506,17 +875,17 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
               <p className="text-[var(--text-main)]/70">
                 {isRepostModalOpen ? 'Deseja compartilhar esta leitura no seu perfil?' : isTrashModalOpen ? 'Esta ação não pode ser desfeita.' : isEditPostModalOpen ? '' : modalState.message}
               </p>
-              
+
               {isEditPostModalOpen && (
                 <div className="mt-4 space-y-4">
-                  <input 
-                    value={editBookTitle} 
+                  <input
+                    value={editBookTitle}
                     onChange={(e) => setEditBookTitle(e.target.value)}
                     placeholder="Título do livro"
                     className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30"
                   />
-                  <textarea 
-                    value={editContent} 
+                  <textarea
+                    value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={4}
                     className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30 resize-none"
@@ -524,16 +893,16 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
                 </div>
               )}
             </div>
-            
+
             <div className="p-4 bg-[var(--border)]/5 border-t border-[var(--border)] flex justify-end gap-3">
-              <button 
+              <button
                 onClick={() => { setIsRepostModalOpen(false); setIsTrashModalOpen(false); setIsEditPostModalOpen(false); setModalState(prev => ({ ...prev, open: false })); }}
-                className="px-6 py-2 rounded-full font-medium text-[var(--text-main)]/60 hover:bg-[var(--border)]/10 transition-colors"
+                className="px-6 py-2 rounded-full font-medium text-[var(--text-main)]/60 hover:bg-[var(--text-main)]/10 transition-colors"
               >
                 {modalState.open ? 'Fechar' : 'Cancelar'}
               </button>
               {!modalState.open && (
-                <button 
+                <button
                   onClick={isRepostModalOpen ? confirmRepost : isTrashModalOpen ? confirmMoveToTrash : handleSavePostEdit}
                   className={cn(
                     "px-6 py-2 rounded-full font-bold text-white transition-transform active:scale-95",
@@ -547,6 +916,24 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
             </div>
           </div>
         </div>
+      )}
+
+      {selectedMediaIndex !== null && mediaList.length > 0 && (
+        <MediaViewerModal
+          postId={id}
+          mediaList={mediaList as any} // we cast as any since the type definitions are slightly different but compatible
+          initialIndex={selectedMediaIndex}
+          onClose={() => setSelectedMediaIndex(null)}
+          author={author}
+          content={content}
+          timeAgo={timeAgo}
+          likesCount={likesCount}
+          commentsCount={commentsCount}
+          sharesCount={sharesCount ?? 0}
+          isLiked={isLiked}
+          onLikeToggle={handleLike}
+          onShare={handleShare}
+        />
       )}
     </article>
   );

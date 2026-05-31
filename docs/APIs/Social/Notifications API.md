@@ -5,7 +5,7 @@ API unificada para contagem de itens não lidos, projetada para otimizar o compo
 ## Segurança e Performance
 - 🔒 **Protegida:** Sim (JWT).
 - 🚀 **Performance:** Substitui múltiplas chamadas pesadas por uma única consulta leve.
-- ⚡ **Orquestração:** Combina dados de Chat (via RPC) e Atividade (Social) em um único payload JSON.
+- ⚡ **Orquestração:** Combina dados de Mensagens (via RPC) e Atividade (Social) em um único payload JSON.
 
 ---
 
@@ -16,16 +16,17 @@ API unificada para contagem de itens não lidos, projetada para otimizar o compo
 ### Resposta (200 OK)
 ```json
 {
-  "chat": 5,          // Total de mensagens não lidas em todas as conversas
-  "activity": 12,     // Total de novos likes, comentários e seguidores
+  "total": 17,        // Soma de chat + activity para a badge global de "Mensagens"
+  "chat": 5,          // Mensagens não lidas
+  "activity": 12,     // Novos likes, comentários e seguidores
   "timestamp": "ISO-8601"
 }
 ```
 
 ### Comportamento
-1. **Chat:** Recupera a lista de participações do usuário e executa a RPC `get_chat_unread_counts`.
+1. **Mensagens:** Recupera a lista de participações do usuário e executa a RPC `get_chat_unread_counts`.
 2. **Atividade:** Conta interações em posts do usuário e novos seguidores.
-3. **Consumo:** Utilizada pelo componente `Navigation.tsx` com polling reduzido (30s) e revalidação via Realtime.
+3. **Consumo:** Utilizada pelo componente `Navigation.tsx` para exibir a badge unificada no ícone de **Mensagens**. A aba independente de "Atividades" foi removida da navegação global, passando a ser acessível via lista de conversas.
 
 ---
 *Voltar para: [[00_API_Index]]*

@@ -19,7 +19,7 @@ Gerencia a leitura, criação, exclusão (soft-delete) e likes em comentários d
 - `limit` (Opcional): Máximo de 50.
 
 ### Comportamento
-Busca apenas os comentários "raiz" (`parent_id is null`) que não foram deletados (`deleted_at is null`), incluindo a contagem de likes.
+Busca todos os comentários do post que não foram deletados (`deleted_at is null`), incluindo a contagem de likes. O cliente é responsável por montar a árvore de respostas (parent/child).
 
 ---
 

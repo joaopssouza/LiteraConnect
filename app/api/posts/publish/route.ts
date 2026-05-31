@@ -30,7 +30,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Rascunho não encontrado ou sem permissão.' }, { status: 404 });
     }
 
-    // 2. Persiste metadados no Supabase (indexação, feed, RLS)
+    // 2. Extrai mídias do rascunho ou do body
+    const media = body.media || draft.media || [];
+    const firstImage = media.find((m: any) => m.type === 'image')?.url || null;
+    const firstVideo = media.find((m: any) => m.type === 'video')?.url || null;
+    const postType = firstVideo ? 'reel' : 'text';
+
+    // 3. Persiste metadados no Supabase (indexação, feed, RLS)
     const { data: postRef, error: pgError } = await supabase
       .from('posts')
       .insert({
@@ -38,17 +44,28 @@ export async function POST(req: Request) {
         // Snippet para preview no feed (primeiros 500 chars do conteúdo limpo)
         content: draft.content?.replace(/<[^>]*>/g, '').slice(0, 500) || '',
         book_title: draft.title || null,
+        book_cover_url: firstImage,
+        video_url: firstVideo,
+        media: media,
+        post_type: postType,
         status: 'published',
         visibility: visibility || draft.visibility || 'public',
         scheduled_at: scheduledAt || null,
-        mongo_document_id: draft._id.toString(),
       })
       .select('id')
       .single();
 
     if (pgError || !postRef) {
-      console.error('Erro ao inserir post no Supabase:', pgError);
-      return NextResponse.json({ error: 'Falha ao publicar no feed.' }, { status: 500 });
+      console.error('Erro ao inserir post no Supabase:', {
+        message: pgError?.message,
+        code: pgError?.code,
+        details: pgError?.details,
+        hint: pgError?.hint,
+      });
+      return NextResponse.json(
+        { error: 'Falha ao publicar no feed.', details: pgError?.message },
+        { status: 500 }
+      );
     }
 
     // 3. Move o draft para a coleção post_contents no MongoDB
@@ -80,6 +97,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, postId: postRef.id }, { status: 200 });
   } catch (error: any) {
     console.error('Error publishing post:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error', details: error?.message || error }, { status: 500 });
   }
 }

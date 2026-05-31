@@ -10,22 +10,25 @@ create table public.users (
   handle text unique not null,
   avatar_url text,
   bio text,
+  birth_date date,
+  gender text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- 3. Criar a tabela de Resenhas/Posts (Posts)
 create table public.posts (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   user_id uuid references public.users(id) on delete cascade not null,
   content text not null,
   book_title text,
   book_cover_url text,
+  media jsonb default '[]'::jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- 4. Criar a tabela de Curtidas (Likes)
 create table public.likes (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   post_id uuid references public.posts(id) on delete cascade not null,
   user_id uuid references public.users(id) on delete cascade not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -34,7 +37,7 @@ create table public.likes (
 
 -- 5. Criar a tabela de Comentários (Comments)
 create table public.comments (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   post_id uuid references public.posts(id) on delete cascade not null,
   user_id uuid references public.users(id) on delete cascade not null,
   parent_id uuid references public.comments(id) on delete cascade,
@@ -46,7 +49,7 @@ create table public.comments (
 
 -- 5.1 Criar a tabela de Curtidas em Comentários (Comment Likes)
 create table public.comment_likes (
-  id uuid default uuid_generate_v4() primary key,
+  id uuid default gen_random_uuid() primary key,
   comment_id uuid references public.comments(id) on delete cascade not null,
   user_id uuid references public.users(id) on delete cascade not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -112,12 +115,14 @@ declare
 begin
   user_handle := coalesce(new.raw_user_meta_data->>'handle', split_part(new.email, '@', 1));
   
-  insert into public.users (id, name, handle, avatar_url)
+  insert into public.users (id, name, handle, avatar_url, birth_date, gender)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
     user_handle,
-    coalesce(new.raw_user_meta_data->>'avatar_url', '/api/avatar?seed=' || user_handle || '&size=150')
+    coalesce(new.raw_user_meta_data->>'avatar_url', '/api/avatar?seed=' || user_handle || '&size=150'),
+    (new.raw_user_meta_data->>'birth_date')::date,
+    new.raw_user_meta_data->>'gender'
   );
   return new;
 end;
@@ -196,3 +201,19 @@ $$;
 
 grant execute on function public.get_chat_unread_counts(uuid, uuid[]) to anon, authenticated, service_role;
 grant execute on function public.get_chat_unread_counts(uuid[], uuid) to anon, authenticated, service_role;
+
+-- 11. Coluna de privacidade para o perfil
+alter table public.users add column if not exists is_private boolean default false;
+
+-- 12. Tabela de Bloqueio de Usuários (User Blocks)
+create table public.user_blocks (
+  blocker_id uuid references public.users(id) on delete cascade not null,
+  blocked_id uuid references public.users(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  primary key (blocker_id, blocked_id)
+);
+
+alter table public.user_blocks enable row level security;
+create policy "Users can view blocks they created" on public.user_blocks for select using (auth.uid() = blocker_id);
+create policy "Users can block others" on public.user_blocks for insert with check (auth.uid() = blocker_id);
+create policy "Users can unblock others" on public.user_blocks for delete using (auth.uid() = blocker_id);

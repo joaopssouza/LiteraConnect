@@ -31,6 +31,7 @@ export default function ActivityClient() {
   const [loading, setLoading] = useState(true);
   const [showLiveBanner, setShowLiveBanner] = useState(false);
   const [newActivitiesCount, setNewActivitiesCount] = useState(0);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousActivityIdsRef = useRef<string[]>([]);
 
@@ -223,15 +224,20 @@ export default function ActivityClient() {
                         <Link href={`/post/${activity.post.id}`} className="mt-2 block">
                           <div className="flex items-start gap-3 border-l-2 border-[var(--border)] pl-3">
                             {activity.post.book_cover_url && (
-                              <div className="relative w-[58px] h-[58px] rounded-md overflow-hidden border border-[var(--border)] flex-shrink-0">
-                                <Image
-                                  src={activity.post.book_cover_url}
-                                  alt="Miniatura do post"
-                                  fill
-                                  className="object-cover"
-                                  referrerPolicy="no-referrer"
-                                  sizes="58px"
-                                />
+                              <div className="relative w-[58px] h-[58px] rounded-md overflow-hidden border border-[var(--border)] flex-shrink-0 bg-[var(--muted)] flex items-center justify-center">
+                                {imageErrors[activity.id] ? (
+                                  <span className="text-[10px] font-bold text-[var(--text-main)]/50 tracking-tighter text-center leading-tight px-1">DELETADO</span>
+                                ) : (
+                                  <Image
+                                    src={activity.post.book_cover_url}
+                                    alt="Miniatura do post"
+                                    fill
+                                    className="object-cover"
+                                    referrerPolicy="no-referrer"
+                                    sizes="58px"
+                                    onError={() => setImageErrors(prev => ({ ...prev, [activity.id]: true }))}
+                                  />
+                                )}
                               </div>
                             )}
                             <p className="text-[var(--text-main)]/60 text-sm line-clamp-2 hover:text-[var(--text-main)] transition-colors flex-1">

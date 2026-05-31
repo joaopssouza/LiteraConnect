@@ -1,4 +1,4 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -13,7 +13,11 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'http://192.168.205.249:3000',
+    'https://192.168.100.7:3000',
+    'http://192.168.100.7:3000',
+    'https://literaconnect.vercel.app',
+    'https://literaconnect.jpdev.uk',
+    'http://10.195.12.51:3000',
   ],
   // Allow access to remote image providers used by the app.
   images: {
@@ -21,28 +25,40 @@ const nextConfig: NextConfig = {
     contentDispositionType: 'attachment' as const,
     remotePatterns: [
       {
-        // Supabase Storage self-hosted (exposto via Nginx Proxy Manager)
-        // Configure NEXT_PUBLIC_SUPABASE_STORAGE_HOSTNAME no .env com o seu domínio
-        // Ex: files.literaconnect.com.br ou o IP do servidor para dev local
         protocol: 'https',
-        hostname: process.env.NEXT_PUBLIC_SUPABASE_STORAGE_HOSTNAME ?? '**.supabase.co',
-        port: '',
-        pathname: '/storage/v1/object/public/**',
+        hostname: 'literaconnect.jpdev.uk',
       },
       {
-        // Supabase Studio / Kong local (desenvolvimento sem HTTPS)
         protocol: 'http',
         hostname: 'localhost',
-        port: '8000',
-        pathname: '/storage/v1/object/public/**',
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/auth/v1/:path*',
+        destination: 'http://supabase_kong:8000/auth/v1/:path*',
+      },
+      {
+        source: '/rest/v1/:path*',
+        destination: 'http://supabase_kong:8000/rest/v1/:path*',
+      },
+      {
+        source: '/storage/v1/:path*',
+        destination: 'http://supabase_kong:8000/storage/v1/:path*',
+      },
+      {
+        source: '/realtime/v1/:path*',
+        destination: 'http://supabase_kong:8000/realtime/v1/:path*',
+      },
+    ];
+  },
   output: 'standalone',
   transpilePackages: ['motion'],
-  webpack: (config, {dev}) => {
+  webpack: (config: any, { dev }: { dev: boolean }) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
-    // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+    // Do not modify—file watching is disabled to prevent flickering during agent edits.
     if (dev && process.env.DISABLE_HMR === 'true') {
       config.watchOptions = {
         ignored: /.*/,

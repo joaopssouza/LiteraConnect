@@ -7,7 +7,7 @@ import { PostCard } from '@/components/PostCard';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { Camera, X } from 'lucide-react';
-import { uploadToStorage, deleteFromStorage } from '@/lib/storage';
+import { uploadMedia } from '@/lib/supabase-storage';
 import Link from 'next/link';
 import { resolveAvatarUrl } from '@/lib/avatar';
 
@@ -83,7 +83,7 @@ export default function ProfileHandleClient() {
           .from('posts')
           .select(`
             *,
-            author:users (
+            author:users!posts_user_id_fkey (
               name,
               handle,
               avatar_url
@@ -95,7 +95,32 @@ export default function ProfileHandleClient() {
           .order('created_at', { ascending: false });
 
         if (postsError) throw postsError;
-        setPosts(postsData || []);
+
+        const postsWithComments = await Promise.all((postsData || []).map(async (post: any) => {
+          const { data: recentComments } = await supabase
+            .from('comments')
+            .select('id, content, created_at, user_id, author:users!comments_user_id_fkey(name, handle, avatar_url), likes:comment_likes(count)')
+            .eq('post_id', post.id)
+            .is('parent_id', null)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(3);
+
+          if (recentComments) {
+            for (const c of recentComments) {
+              const { count: repliesCount } = await supabase
+                .from('comments')
+                .select('*', { count: 'exact', head: true })
+                .eq('parent_id', c.id)
+                .is('deleted_at', null);
+              (c as any).likes_count = c.likes?.[0]?.count ?? 0;
+              (c as any).replies_count = repliesCount ?? 0;
+            }
+          }
+          return { ...post, recent_comments: recentComments || [] };
+        }));
+
+        setPosts(postsWithComments);
 
         const { count: followers } = await supabase
           .from('follows')
@@ -142,7 +167,7 @@ export default function ProfileHandleClient() {
         .from('posts')
         .select(`
           *,
-          author:users (
+          author:users!posts_user_id_fkey (
             name,
             handle,
             avatar_url
@@ -297,11 +322,7 @@ export default function ProfileHandleClient() {
 
     setIsUploadingAvatar(true);
     try {
-      // Remove o avatar antigo do storage antes de enviar o novo
-      if (profile.avatar_url && profile.avatar_url.includes('/storage/v1/object/public/avatars/')) {
-        await deleteFromStorage(profile.avatar_url, 'avatars');
-      }
-      const uploadedUrl = await uploadToStorage(file, 'avatars');
+      const uploadedUrl = await uploadMedia(file);
       const { error } = await supabase
         .from('users')
         .update({ avatar_url: uploadedUrl })
@@ -343,7 +364,7 @@ export default function ProfileHandleClient() {
           <div className="relative">
             <div className="w-24 h-24 rounded-full bg-brand-2 flex-shrink-0 flex items-center justify-center text-white font-bold overflow-hidden relative border-4 border-[var(--surface)] shadow-sm group">
               {profile.avatar_url ? (
-                <Image src={profile.avatar_url} alt={profile.name} fill className="object-cover" unoptimized />
+                <Image src={profile.avatar_url} alt={profile.name} fill className="object-cover" unoptimized priority />
               ) : (
                 <span className="text-3xl">{profile.name.charAt(0)}</span>
               )}
@@ -379,12 +400,20 @@ export default function ProfileHandleClient() {
             </button>
           )}
           {isOwnProfile && (
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="px-6 py-2 rounded-full font-bold bg-brand-2 text-white hover:opacity-90 shadow-lg active:scale-95 transition-all"
-            >
-              Editar Perfil
-            </button>
+            <div className="flex gap-2">
+              <Link
+                href="/settings"
+                className="w-10 h-10 flex items-center justify-center rounded-full border border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--border)]/30 transition-colors shadow-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-settings"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+              </Link>
+              <button
+                onClick={() => setIsEditModalOpen(true)}
+                className="px-6 py-2 rounded-full font-bold bg-brand-2 text-white hover:opacity-90 shadow-lg active:scale-95 transition-all"
+              >
+                Editar Perfil
+              </button>
+            </div>
           )}
         </div>
 
@@ -449,10 +478,12 @@ export default function ProfileHandleClient() {
               }}
               content={post.content}
               bookTitle={post.book_title}
-              bookCover={post.book_cover_url}
+              bookCover={post.book_cover_url ?? post.video_url}
+              media={post.media}
               timeAgo={new Date(post.created_at).toLocaleDateString('pt-BR')}
               likes={post.likes?.[0]?.count ?? 0}
               comments={post.comments?.[0]?.count ?? 0}
+              recent_comments={post.recent_comments}
               reposts={0}
               views={post.views ?? 0}
               shares={post.shares ?? 0}

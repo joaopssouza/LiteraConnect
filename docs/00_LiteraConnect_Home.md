@@ -15,5 +15,5 @@ Bem-vindo à documentação oficial do **LiteraConnect**, uma plataforma social 
 Construir uma experiência fluida e rica:
 - **Feed Rico:** Mistura de trending e seguindo, acelerado por Redis.
 - **Descoberta:** Busca full-text e recomendação de autores/tópicos.
-- **Interação:** Chat em tempo real e notificações.
+- **Interação:** Mensagens em tempo real e notificações.
 - **Conteúdo:** Editor WYSIWYG (TipTap) com rascunhos e publicação estruturada.

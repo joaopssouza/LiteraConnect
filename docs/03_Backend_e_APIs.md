@@ -1,11 +1,12 @@
 # Backend e APIs (Next.js)
 
-O backend do LiteraConnect vive dentro da pasta `app/api/` e utiliza as API Routes e Server Actions do Next.js. O sistema é executado em modo `standalone` dentro de um container Docker, otimizando o consumo de recursos na infraestrutura self-hosted.
+O backend do LiteraConnect vive dentro da pasta `app/api/` e utiliza o ecossistema Serverless do Next.js (App Router).
 
 ## Segurança Global e Auth
 - Validação de sessão estrita via SSR com `@supabase/ssr` (`auth.getUser()`).
 - Tokens JWT validados no servidor antes de autorizar qualquer transação.
 - O `userId` é *sempre* extraído do token, nunca de payloads ou query strings, prevenindo ataques de personificação.
+- **Rate Limiting (Edge Middleware):** Proteção contra abusos (DDoS/Spam) via algoritmo **Token Bucket** usando `@upstash/ratelimit` e Redis. Limite de 30 requisições (burst) com recarga de 30 tokens a cada 10 segundos. Utiliza `ephemeralCache` e mapeamento híbrido (ID do JWT com fallback seguro para IP via `x-forwarded-for`).
 
 ## Rotas Principais (Endpoints)
 
@@ -14,15 +15,15 @@ O backend do LiteraConnect vive dentro da pasta `app/api/` e utiliza as API Rout
 - **Função:** Agrega de forma inteligente os eventos (likes, comentários, novos seguidores) ligados aos posts do usuário autenticado.
 - **Performance:** Utiliza sistema de Server Cache interno (`getOrSetServerCache`) com TTL de 7 segundos para proteger o banco de dados contra polling excessivo.
 
-### `/api/chat/conversations`
+### `/api/chat/conversations` (Módulo Mensagens)
 - **Métodos:** `GET`, `PATCH`
 - **Função:** 
-  - `GET`: Retorna a lista de conversas, incluindo o preview da **última mensagem** recuperada via única query otimizada (eliminando o problema N+1).
+  - `GET`: Retorna a lista de conversas, incluindo o preview da **última mensagem** e o item fixo de **Atividades** injetado no topo.
   - `PATCH`: Marca uma conversa específica como lida (`last_read_at`).
 
 ### `/api/notifications/unread-count`
 - **Métodos:** `GET`
-- **Função:** Endpoint de alta performance para o `Navigation.tsx`. Retorna em um único payload as contagens de Chat e Atividades sociais, reduzindo o polling e o consumo de dados.
+- **Função:** Endpoint de alta performance para o `Navigation.tsx`. Retorna a soma de `unreadMessages` + `unreadActivityCount`, utilizada para exibir a badge global no ícone de **Mensagens**.
 
 ### `/api/drafts`
 - **Métodos:** `POST`, `PUT`

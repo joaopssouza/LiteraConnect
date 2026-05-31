@@ -17,15 +17,6 @@ const ThemeContext = createContext<ThemeContextValue>({
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light');
 
-  // Inicializa a partir do localStorage ou preferência do sistema
-  useEffect(() => {
-    const stored = localStorage.getItem('lc-theme') as Theme | null;
-    const preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    const initial = stored || preferred;
-    setTheme(initial);
-    applyTheme(initial);
-  }, []);
-
   const applyTheme = (t: Theme) => {
     const root = document.documentElement;
     if (t === 'dark') {
@@ -34,6 +25,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.remove('dark');
     }
   };
+
+  // Inicializa a partir do localStorage ou preferência do sistema
+  useEffect(() => {
+    setTimeout(() => {
+      const stored = localStorage.getItem('lc-theme') as Theme | null;
+      const preferred = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      const initial = stored || preferred;
+      setTheme(initial);
+      applyTheme(initial);
+    }, 0);
+  }, []);
 
   const toggle = () => {
     setTheme((prev) => {

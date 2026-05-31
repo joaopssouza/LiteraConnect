@@ -13,6 +13,8 @@ export interface SearchPost {
   content: string;
   book_title: string | null;
   book_cover_url: string | null;
+  video_url: string | null;
+  media?: Array<{ url: string; type: 'image' | 'video' }>;
   created_at: string;
   likes_count: number;
   comments_count: number;
@@ -31,6 +33,8 @@ export interface TrendingPost {
   content: string;
   book_title: string | null;
   book_cover_url: string | null;
+  video_url: string | null;
+  media?: Array<{ url: string; type: 'image' | 'video' }>;
   created_at: string;
   likes_count: number;
   views?: number;

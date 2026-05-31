@@ -4,7 +4,8 @@ import clientPromise from '@/lib/mongodb';
 
 // POST /api/cron/consolidate-views
 // Consolidado: lê todos os contadores Redis post:*:views e persiste no Supabase.
-// Trigger: container Ofelia (mcuadros/ofelia) configurado no docker-compose.yml.
+// Deve ser chamado via Vercel Cron (vercel.json) ou GitHub Actions (diário/a cada 6h).
+//
 // Proteção: CRON_SECRET no header Authorization (Bearer <token>).
 
 const BATCH_SIZE = 50; // Processa N posts por vez para não sobrecarregar o Supabase

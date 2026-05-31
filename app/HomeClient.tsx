@@ -5,7 +5,7 @@ import { PostCard } from '@/components/PostCard';
 import { PenSquare, Book, Image as ImageIcon, X, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
-import { uploadToStorage } from '@/lib/storage';
+import { uploadMedia } from '@/lib/supabase-storage';
 import { UserSuggestions } from '@/components/UserSuggestions';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { useFeed } from '@/hooks/useFeed';
@@ -47,9 +47,9 @@ export default function HomeClient() {
 
       if (imageFile) {
         try {
-          uploadedImageUrl = await uploadToStorage(imageFile, 'post-images');
+          uploadedImageUrl = await uploadMedia(imageFile);
         } catch {
-          alert('Erro ao fazer upload da imagem. Verifique as configurações do Storage.');
+          alert('Erro ao fazer upload da imagem no Supabase.');
           return;
         }
       }
@@ -84,9 +84,9 @@ export default function HomeClient() {
     <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)]">
       <header className="sticky top-0 z-10 bg-[var(--bg-main)]/80 backdrop-blur-md border-b border-[var(--border)] p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-[var(--text-main)]">Feed de Resenhas</h1>
-        <button className="md:hidden bg-brand-2 text-white p-2 rounded-full shadow-lg">
+        <Link href="/post" className="md:hidden bg-brand-2 text-white p-2 rounded-full shadow-lg">
           <PenSquare className="w-5 h-5" />
-        </button>
+        </Link>
       </header>
 
       {/* Create Post */}
@@ -115,8 +115,12 @@ export default function HomeClient() {
               className="w-full bg-transparent resize-none outline-none text-lg text-[var(--text-main)] placeholder:text-[var(--text-main)]/20 min-h-[80px]"
             />
             {imagePreview && (
-              <div className="relative mb-4 inline-block">
-                <img src={imagePreview} alt="Preview" className="max-h-64 rounded-xl border border-[var(--border)] object-contain bg-black/5" />
+              <div className="relative mb-4 inline-block w-full">
+                {imageFile?.type.startsWith('video/') ? (
+                  <video src={imagePreview} controls className="max-h-64 w-full rounded-xl border border-[var(--border)] object-contain bg-black/5" />
+                ) : (
+                  <img src={imagePreview} alt="Preview" className="max-h-64 rounded-xl border border-[var(--border)] object-contain bg-black/5" />
+                )}
                 <button
                   type="button"
                   onClick={removeImage}
@@ -126,7 +130,7 @@ export default function HomeClient() {
                 </button>
               </div>
             )}
-            <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
+            <input type="file" accept="image/*,video/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
             <div className="flex justify-between items-center mt-2 pt-3 border-t border-[var(--border)]">
               <div className="flex gap-1 text-brand-2">
                 <button type="button" className="p-2 hover:bg-[var(--border)]/50 rounded-full transition-colors">
@@ -187,10 +191,12 @@ export default function HomeClient() {
                 }}
                 content={post.content}
                 bookTitle={post.book_title ?? undefined}
-                bookCover={post.book_cover_url ?? undefined}
+                bookCover={post.book_cover_url ?? post.video_url ?? undefined}
+                media={post.media}
                 timeAgo={new Date(post.created_at).toLocaleDateString('pt-BR')}
                 likes={post.likes_count ?? 0}
                 comments={post.comments_count ?? 0}
+                recent_comments={post.recent_comments}
                 reposts={0}
                 views={post.views ?? 0}
                 shares={post.shares ?? 0}

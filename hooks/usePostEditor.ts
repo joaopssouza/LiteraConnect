@@ -7,6 +7,7 @@ export interface DraftData {
   title: string;
   content: string;
   visibility: 'public' | 'unlisted';
+  media?: Array<{ url: string; type: 'image' | 'video' }>;
 }
 
 interface UsePostEditorReturn {
@@ -25,6 +26,7 @@ export function usePostEditor(initialData?: Partial<DraftData>): UsePostEditorRe
     title: initialData?.title || '',
     content: initialData?.content || '',
     visibility: initialData?.visibility || 'public',
+    media: initialData?.media || [],
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -46,6 +48,7 @@ export function usePostEditor(initialData?: Partial<DraftData>): UsePostEditorRe
       currentData.title === lastSavedDataRef.current.title &&
       currentData.content === lastSavedDataRef.current.content &&
       currentData.visibility === lastSavedDataRef.current.visibility && 
+      JSON.stringify(currentData.media) === JSON.stringify(lastSavedDataRef.current.media) &&
       data.id // Se for rascunho novo (sem id), tenta salvar de qlqr forma se tem conteudo
     ) {
       return;
@@ -95,7 +98,11 @@ export function usePostEditor(initialData?: Partial<DraftData>): UsePostEditorRe
       const publishRes = await fetch('/api/posts/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftId: data.id || lastSavedDataRef.current.id, visibility: data.visibility }),
+        body: JSON.stringify({ 
+          draftId: data.id || lastSavedDataRef.current.id, 
+          visibility: data.visibility,
+          media: data.media
+        }),
       });
 
       if (!publishRes.ok) throw new Error('Falha ao publicar post');

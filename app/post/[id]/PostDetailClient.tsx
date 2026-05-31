@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { PostCard } from '@/components/PostCard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -84,9 +84,10 @@ const buildCommentTree = (flatComments: CommentRecord[]): ThreadComment[] => {
 
 export default function PostDetailClient() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [post, setPost] = useState<any>(null);
   const [comments, setComments] = useState<CommentRecord[]>([]);
@@ -102,10 +103,18 @@ export default function PostDetailClient() {
   const [isSavingCommentId, setIsSavingCommentId] = useState<string | null>(null);
   const [isDeletingCommentId, setIsDeletingCommentId] = useState<string | null>(null);
   const [likeLoadingMap, setLikeLoadingMap] = useState<Record<string, boolean>>({});
+  const [threadLimits, setThreadLimits] = useState<Record<string, number>>({});
   const [modalState, setModalState] = useState<ModalState>({ open: false, title: '', message: '' });
   const mainCommentInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const threadComments = useMemo(() => buildCommentTree(comments), [comments]);
+
+  const toggleThread = (commentId: string, action: 'expand' | 'collapse') => {
+    setThreadLimits(prev => ({
+      ...prev,
+      [commentId]: action === 'collapse' ? 0 : (prev[commentId] || 0) + 20
+    }));
+  };
 
   const openModal = (title: string, message: string) => {
     setModalState({ open: true, title, message });
@@ -138,6 +147,16 @@ export default function PostDetailClient() {
     }
   }, [id]);
 
+  useEffect(() => {
+    if (searchParams.get('success') === 'tip') {
+      openModal('Obrigado pelo seu apoio! 💖', 'Sua gorjeta foi enviada com sucesso ao autor.');
+      
+      // Remove o parâmetro da URL de forma silenciosa para não recarregar
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [searchParams]);
+
   const fetchPostAndComments = async () => {
     setLoading(true);
     try {
@@ -145,7 +164,7 @@ export default function PostDetailClient() {
         .from('posts')
         .select(`
           *,
-          author:users (
+          author:users!posts_user_id_fkey (
             name,
             handle,
             avatar_url
@@ -156,14 +175,35 @@ export default function PostDetailClient() {
         .eq('id', id)
         .single();
 
-      if (postError) throw postError;
-      setPost(postData);
+      if (postError) {
+        console.error('Erro Supabase Post:', postError);
+        throw postError;
+      }
+
+      // Mescla views do Redis (tempo real) com views_count do banco
+      let mergedPost = postData;
+      try {
+        const viewsRes = await fetch(`/api/posts/${id}/views`);
+        if (viewsRes.ok) {
+          const { views } = await viewsRes.json();
+          mergedPost = {
+            ...postData,
+            views: Math.max(postData?.views_count ?? 0, views ?? 0),
+          };
+        } else {
+          mergedPost = { ...postData, views: postData?.views_count ?? 0 };
+        }
+      } catch {
+        mergedPost = { ...postData, views: postData?.views_count ?? 0 };
+      }
+      setPost(mergedPost);
+
 
       const { data: commentsData, error: commentsError } = await supabase
         .from('comments')
         .select(`
           *,
-          author:users (
+          author:users!comments_user_id_fkey (
             name,
             handle,
             avatar_url
@@ -173,7 +213,10 @@ export default function PostDetailClient() {
         .is('deleted_at', null)
         .order('created_at', { ascending: true });
 
-      if (commentsError) throw commentsError;
+      if (commentsError) {
+        console.error('Erro Supabase Comments:', commentsError);
+        throw commentsError;
+      }
 
       const commentRows = (commentsData || []) as Omit<CommentRecord, 'likes_count' | 'liked_by_me'>[];
       const commentIds = commentRows.map((comment) => comment.id);
@@ -332,6 +375,11 @@ export default function PostDetailClient() {
     const canInlineReply = depth === 0;
     const showReplyComposer = canInlineReply && replyingTo === comment.id && !!user && !isDeleted;
 
+    const limit = threadLimits[comment.id] || 0;
+    const isExpanded = limit > 0;
+    const visibleChildren = comment.children.slice(0, limit);
+    const hasMore = visibleChildren.length < comment.children.length;
+
     return (
       <div key={comment.id} className={depth > 0 ? 'ml-6 md:ml-10 pl-4 border-l border-[var(--border)] mt-4' : ''}>
         <div className="p-4 bg-[var(--bg-main)] hover:bg-[var(--surface)] transition-colors rounded-2xl group">
@@ -410,7 +458,36 @@ export default function PostDetailClient() {
 
               {comment.children.length > 0 && depth === 0 && (
                 <div className="mt-2">
-                  {comment.children.map((child) => renderCommentNode(child, depth + 1))}
+                  {!isExpanded ? (
+                    <button 
+                      onClick={() => toggleThread(comment.id, 'expand')} 
+                      className="flex items-center gap-2 text-xs font-semibold text-brand-2 hover:opacity-80 transition-colors py-2"
+                    >
+                      <div className="w-8 h-px bg-brand-2/30" />
+                      Ver {comment.children.length} resposta{comment.children.length > 1 ? 's' : ''}
+                    </button>
+                  ) : (
+                    <div className="flex flex-col">
+                      {visibleChildren.map((child) => renderCommentNode(child, depth + 1))}
+                      
+                      <div className="flex items-center justify-between mt-2 pl-6 md:ml-10">
+                        {hasMore ? (
+                          <button 
+                            onClick={() => toggleThread(comment.id, 'expand')} 
+                            className="text-xs font-semibold text-brand-2 hover:opacity-80 transition-colors"
+                          >
+                            Ver mais respostas
+                          </button>
+                        ) : <span/>}
+                        <button 
+                          onClick={() => toggleThread(comment.id, 'collapse')} 
+                          className="text-xs font-semibold text-[var(--text-main)]/40 hover:text-[var(--text-main)] transition-colors"
+                        >
+                          Ocultar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -447,24 +524,28 @@ export default function PostDetailClient() {
         }}
         content={post.content}
         bookTitle={post.book_title}
-        bookCover={post.book_cover_url}
+        bookCover={post.book_cover_url ?? post.video_url}
+        media={post.media}
         timeAgo={new Date(post.created_at).toLocaleDateString('pt-BR')}
         likes={post.likes?.[0]?.count ?? 0}
         comments={comments.length}
         reposts={0}
         views={post.views ?? 0}
         shares={post.shares ?? 0}
+        hideCommentInput={true}
       />
 
       {user ? (
         <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
           <div className="flex gap-4">
-            <div className="w-10 h-10 rounded-full bg-brand-2 flex-shrink-0 flex items-center justify-center text-white font-bold overflow-hidden border border-[var(--border)]">
-              {user.user_metadata?.avatar_url ? (
-                <img src={user.user_metadata.avatar_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span>{user.user_metadata?.full_name?.charAt(0) || 'U'}</span>
-              )}
+            <div className="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden border border-[var(--border)] relative bg-[var(--border)]/20">
+              <Image
+                src={resolveAvatarUrl(profile?.avatar_url || user.user_metadata?.avatar_url, profile?.handle || user.user_metadata?.handle, 100)}
+                alt=""
+                fill
+                className="object-cover"
+                unoptimized
+              />
             </div>
             <form onSubmit={handleCommentSubmit} className="flex-1 flex flex-col items-end">
               <textarea 

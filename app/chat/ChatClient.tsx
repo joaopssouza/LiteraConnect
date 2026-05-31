@@ -2,15 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import {
   Search, Plus, Send, CheckCheck, X, UserPlus, Loader2,
   Pencil, Trash2, Smile, Settings, Phone, Video, Info,
-  ImageIcon, Paperclip, PlusCircle, Lock
+  ImageIcon, Paperclip, PlusCircle, Lock, Bell
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import { useOfflineMessages } from '@/hooks/useOfflineMessages';
 
 /* ─── Helper: avatar com fallback robusto e proporção garantida ─── */
 function AvatarImg({
@@ -21,7 +23,7 @@ function AvatarImg({
     // Wrapper com dimensões fixas garante aspecto quadrado independente da imagem nativa
     <div
       style={{ width: size, height: size, minWidth: size, minHeight: size }}
-      className={cn('overflow-hidden flex-shrink-0', className)}
+      className={cn('overflow-hidden flex-shrink-0 aspect-square rounded-full', className)}
     >
       <Image
         src={resolved}
@@ -69,9 +71,11 @@ interface Message {
 
 export default function ChatClient() {
   const { user } = useAuth();
+  const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [sidebarSearch, setSidebarSearch] = useState('');
+  const [activityUnreadCount, setActivityUnreadCount] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingConvos, setLoadingConvos] = useState(false);
@@ -91,6 +95,9 @@ export default function ChatClient() {
   const [hoveredMsgId, setHoveredMsgId] = useState<string | null>(null);
   const [emojiPickerMsgId, setEmojiPickerMsgId] = useState<string | null>(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  const { saveMessage, getPending, markSent, markFailed, clearSent } = useOfflineMessages();
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -99,9 +106,39 @@ export default function ChatClient() {
   const selectedByUserRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isTypingRef = useRef(false); // evita track() redundante quando estado nao muda
+  const fileInputMediaRef = useRef<HTMLInputElement | null>(null);
+  const fileInputDocRef = useRef<HTMLInputElement | null>(null);
 
   /* ─── Data loading ─── */
-  useEffect(() => { if (user) loadConversations(); }, [user]);
+  useEffect(() => { 
+    if (user) {
+      loadConversations();
+      
+      const fetchActivityUnread = async () => {
+        try {
+          const res = await fetch('/api/notifications/unread-count');
+          if (!res.ok) return;
+          const data = await res.json();
+          const newActivityTotal = data.activity || 0;
+          const lastSeenActivity = Number(localStorage.getItem(`last-activity-count-${user.id}`) || 0);
+          setActivityUnreadCount(Math.max(0, newActivityTotal - lastSeenActivity));
+        } catch (err) {}
+      };
+      
+      fetchActivityUnread();
+      
+      const activityChannel = supabase
+        .channel(`chat-activity-unread:${user.id}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes' }, fetchActivityUnread)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, fetchActivityUnread)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follows', filter: `following_id=eq.${user.id}` }, fetchActivityUnread)
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(activityChannel);
+      };
+    } 
+  }, [user]);
 
   /* ─── Carrega mensagens e cria subscription quando muda a conversa ─── */
   useEffect(() => {
@@ -123,6 +160,38 @@ export default function ChatClient() {
     markConversationAsRead(selectedId);
   }, [isWindowFocused]); // selectedId omitido intencionalmente: so reage a mudanca de foco
 
+  /* ─── Envio automático de mensagens offline quando volta a conexão ─── */
+  useEffect(() => {
+    if (!selectedId || !user) return;
+    const sendPending = async () => {
+      if (!navigator.onLine) return;
+      const pending = await getPending(selectedId);
+      for (const p of pending) {
+        try {
+          const res = await fetch('/api/chat/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id, conversationId: selectedId, content: p.content, attachmentUrl: p.attachmentUrl })
+          });
+          if (res.ok) {
+            await markSent(p.localId);
+            const d = await res.json();
+            if (d.message) setMessages(prev => [...prev.filter(m => m.id !== p.localId), d.message]);
+          } else {
+            await markFailed(p.localId);
+          }
+        } catch {
+          await markFailed(p.localId);
+        }
+      }
+      await clearSent();
+    };
+    
+    sendPending();
+    window.addEventListener('online', sendPending);
+    return () => window.removeEventListener('online', sendPending);
+  }, [selectedId, user, getPending, markSent, markFailed, clearSent]);
+
   useEffect(() => {
     const onFocus = () => setIsWindowFocused(true);
     const onBlur = () => setIsWindowFocused(false);
@@ -141,8 +210,12 @@ export default function ChatClient() {
     };
   }, [selectedId]);
 
+  const hasInitializedRef = useRef(false);
   useEffect(() => {
-    if (!selectedId && conversations.length > 0) setSelectedId(conversations[0].id);
+    if (!selectedId && conversations.length > 0 && !hasInitializedRef.current && window.innerWidth >= 768) {
+      setSelectedId(conversations[0].id);
+      hasInitializedRef.current = true;
+    }
   }, [selectedId, conversations]);
 
   /* ─── Global presence ─── */
@@ -356,24 +429,69 @@ export default function ChatClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newMessage]); // user omitido: nao queremos recriar o efeito por mudanca de user
 
-  const sendMessage = async () => {
-    if (!user || !selectedId || !newMessage.trim() || sending) return;
+  const sendMessage = async (overrideContent?: string, attachmentUrl?: string) => {
+    const finalContent = overrideContent !== undefined ? overrideContent : newMessage;
+    if (!user || !selectedId || (!finalContent.trim() && !attachmentUrl) || sending) return;
     setSending(true);
-    const opt: Message = { id: `temp-${Date.now()}`, conversation_id: selectedId, user_id: user.id, content: newMessage, created_at: new Date().toISOString() };
+    
+    const localId = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const opt: Message = { id: localId, conversation_id: selectedId, user_id: user.id, content: finalContent, attachment_url: attachmentUrl, created_at: new Date().toISOString() };
     setMessages(prev => [...prev, opt]);
-    const txt = newMessage;
-    setNewMessage('');
-    if (textareaRef.current) { textareaRef.current.style.height = 'auto'; }
-    // Para o indicador de digitando imediatamente ao enviar
-    if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
-    sendTypingState(false);
+    
+    if (overrideContent === undefined) {
+      setNewMessage('');
+      if (textareaRef.current) { textareaRef.current.style.height = 'auto'; }
+      if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
+      sendTypingState(false);
+    }
+    
+    if (!navigator.onLine) {
+      await saveMessage({ conversationId: selectedId, content: finalContent, attachmentUrl });
+      setSending(false);
+      return;
+    }
+
     try {
-      const res = await fetch('/api/chat/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, conversationId: selectedId, content: txt }) });
+      const res = await fetch('/api/chat/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id, conversationId: selectedId, content: finalContent, attachmentUrl }) });
       if (!res.ok) throw new Error();
       const d = await res.json();
       if (d.message) setMessages(prev => prev.map(m => m.id === opt.id ? d.message : m));
-    } catch { setMessages(prev => prev.filter(m => m.id !== opt.id)); }
+    } catch { 
+      await saveMessage({ conversationId: selectedId, content: finalContent, attachmentUrl });
+    }
     finally { setSending(false); }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !selectedId) return;
+    
+    setShowAttachMenu(false);
+    setUploadingFile(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await fetch('/api/chat/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'Erro no upload');
+      }
+      
+      const { url } = await res.json();
+      await sendMessage('', url);
+      
+    } catch (err: any) {
+      alert(err.message || 'Falha ao enviar arquivo.');
+    } finally {
+      setUploadingFile(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   const saveEdit = async (msgId: string) => {
@@ -524,6 +642,34 @@ export default function ChatClient() {
 
         {/* Conversation list */}
         <div className="flex-1 overflow-y-auto">
+          {filter === 'all' && !sidebarSearch.trim() && (
+            <button
+              onClick={() => router.push('/activity')}
+              className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all relative group border-l-2 border-transparent hover:bg-[var(--bg-main)]/60"
+            >
+              <div className="relative flex-shrink-0 w-[46px] h-[46px] min-w-[46px] min-h-[46px] aspect-square bg-[var(--surface)] border border-[var(--border)]/60 rounded-full flex items-center justify-center text-[var(--text-main)]">
+                <Bell className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline justify-between gap-1 mb-0.5">
+                  <span className="text-sm font-semibold truncate text-[var(--text-main)]">
+                    Atividade
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className={cn('text-xs truncate leading-relaxed', activityUnreadCount > 0 ? 'text-[var(--text-main)] font-semibold' : 'text-[var(--text-main)]/40')}>
+                    Notificações, curtidas e comentários
+                  </p>
+                  {activityUnreadCount > 0 && (
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-brand-2 text-white text-[9px] font-black inline-flex items-center justify-center flex-shrink-0">
+                      {activityUnreadCount > 99 ? '99+' : activityUnreadCount}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
+          )}
+
           {loadingConvos ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 className="w-5 h-5 animate-spin text-brand-2/40" />
@@ -696,9 +842,25 @@ export default function ChatClient() {
                                 </div>
                               ) : (
                                 <>
-                                  <p className="whitespace-pre-wrap break-words leading-relaxed">
+                                  <div className="whitespace-pre-wrap break-words leading-relaxed flex flex-col gap-2">
                                     {isDeleted ? <span className="italic opacity-60">Mensagem apagada</span> : msg.content}
-                                  </p>
+                                    {msg.attachment_url && !isDeleted && (
+                                      msg.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)/i) ? (
+                                        <div className="relative w-full max-w-[240px] rounded-xl overflow-hidden mt-1 border border-black/10">
+                                          <Image src={msg.attachment_url} alt="Anexo" width={400} height={400} className="w-full h-auto object-cover" unoptimized />
+                                        </div>
+                                      ) : msg.attachment_url.match(/\.(mp4|webm|ogg)/i) ? (
+                                        <video src={msg.attachment_url} controls className="w-full max-w-[240px] rounded-xl mt-1 border border-black/10" />
+                                      ) : msg.attachment_url.match(/\.(mp3|wav)/i) ? (
+                                        <audio src={msg.attachment_url} controls className="w-full max-w-[240px] mt-1" />
+                                      ) : (
+                                        <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-black/10 rounded-xl mt-1 hover:bg-black/20 transition-colors">
+                                          <Paperclip className="w-4 h-4" />
+                                          <span className="text-sm font-medium underline">Visualizar Anexo</span>
+                                        </a>
+                                      )
+                                    )}
+                                  </div>
                                   <div className={cn('flex items-center justify-end gap-1 mt-1', isMe ? 'text-white/50' : 'text-[var(--text-main)]/30')}>
                                     <span className="text-[9px] font-medium">{formatTime(msg.created_at)}</span>
                                     {msg.edited_at && !isDeleted && <span className="text-[9px]">· editado</span>}
@@ -812,12 +974,14 @@ export default function ChatClient() {
                   </button>
                   {showAttachMenu && (
                     <div className="absolute bottom-12 left-0 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-1.5 shadow-2xl z-20 flex flex-col gap-0.5 min-w-[150px]" onClick={e => e.stopPropagation()}>
-                      <button className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-[var(--text-main)]/70 hover:bg-[var(--bg-main)] hover:text-[var(--text-main)] transition-colors">
+                      <button onClick={() => fileInputMediaRef.current?.click()} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-[var(--text-main)]/70 hover:bg-[var(--bg-main)] hover:text-[var(--text-main)] transition-colors">
                         <ImageIcon className="w-4 h-4 text-brand-2" /> Foto / Vídeo
                       </button>
-                      <button className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-[var(--text-main)]/70 hover:bg-[var(--bg-main)] hover:text-[var(--text-main)] transition-colors">
+                      <button onClick={() => fileInputDocRef.current?.click()} className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-[var(--text-main)]/70 hover:bg-[var(--bg-main)] hover:text-[var(--text-main)] transition-colors">
                         <Paperclip className="w-4 h-4 text-brand-2" /> Arquivo
                       </button>
+                      <input type="file" ref={fileInputMediaRef} className="hidden" accept="image/*,video/*" onChange={handleFileUpload} />
+                      <input type="file" ref={fileInputDocRef} className="hidden" accept=".pdf,.doc,.docx,.txt" onChange={handleFileUpload} />
                     </div>
                   )}
                 </div>
@@ -842,11 +1006,11 @@ export default function ChatClient() {
 
                 {/* Send button */}
                 <button
-                  onClick={sendMessage}
-                  disabled={sending || !newMessage.trim()}
+                  onClick={() => sendMessage()}
+                  disabled={sending || uploadingFile || (!newMessage.trim())}
                   className="flex-shrink-0 w-10 h-10 rounded-full bg-brand-2 text-white flex items-center justify-center hover:opacity-90 disabled:opacity-30 active:scale-90 transition-all shadow-md shadow-brand-2/30"
                 >
-                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {sending || uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </div>
             </footer>

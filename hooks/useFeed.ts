@@ -8,9 +8,13 @@ export interface FeedPost {
   content: string;
   book_title?: string | null;
   book_cover_url?: string | null;
+  video_url?: string | null;
+  media?: Array<{ url: string; type: 'image' | 'video' }>;
+  post_type?: string;
   created_at: string;
   status: string;
   visibility: string;
+  is_premium?: boolean;
   views?: number;
   shares?: number;
   likes_count: number;
@@ -20,6 +24,7 @@ export interface FeedPost {
     handle: string;
     avatar_url: string | null;
   };
+  recent_comments?: any[];
 }
 
 interface UseFeedReturn {

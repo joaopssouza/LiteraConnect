@@ -25,7 +25,6 @@ export async function GET(request: Request) {
       )
       .eq('post_id', postId)
       .is('deleted_at', null)
-      .is('parent_id', null) // Apenas comentários raiz
       .order('created_at', { ascending: true })
       .limit(limit + 1);
 
@@ -92,6 +91,84 @@ export async function POST(request: Request) {
       .single();
 
     if (error) throw error;
+
+    // --- Notificações (fire-and-forget, sem bloquear a resposta) ---
+    (async () => {
+      try {
+        const notificationsToInsert: object[] = [];
+
+        // 1. Notificar o dono do post (comment ou reply)
+        const { data: postOwner } = await supabase
+          .from('posts')
+          .select('user_id')
+          .eq('id', postId)
+          .single();
+
+        const postOwnerId = postOwner?.user_id;
+        const notifType = parentId ? 'reply' : 'comment';
+
+        if (postOwnerId && postOwnerId !== user.id) {
+          notificationsToInsert.push({
+            user_id: postOwnerId,
+            actor_id: user.id,
+            type: notifType,
+            post_id: postId,
+            comment_id: data.id,
+          });
+        }
+
+        // 2. Se for uma resposta, notificar o autor do comentário pai
+        if (parentId) {
+          const { data: parentComment } = await supabase
+            .from('comments')
+            .select('user_id')
+            .eq('id', parentId)
+            .single();
+
+          if (parentComment?.user_id && parentComment.user_id !== user.id && parentComment.user_id !== postOwnerId) {
+            notificationsToInsert.push({
+              user_id: parentComment.user_id,
+              actor_id: user.id,
+              type: 'reply',
+              post_id: postId,
+              comment_id: data.id,
+            });
+          }
+        }
+
+        // 3. Notificar usuários mencionados via @handle
+        const mentionMatches = content.trim().match(/@([a-zA-Z0-9_]+)/g);
+        if (mentionMatches && mentionMatches.length > 0) {
+          const handles = [...new Set(mentionMatches.map((m: string) => m.slice(1)))];
+          const { data: mentionedUsers } = await supabase
+            .from('users')
+            .select('id')
+            .in('handle', handles);
+
+          for (const mu of mentionedUsers || []) {
+            // Não duplicar notificação para quem já foi notificado acima
+            const alreadyNotified = notificationsToInsert.some((n: any) => n.user_id === mu.id);
+            if (!alreadyNotified && mu.id !== user.id) {
+              notificationsToInsert.push({
+                user_id: mu.id,
+                actor_id: user.id,
+                type: 'mention',
+                post_id: postId,
+                comment_id: data.id,
+              });
+            }
+          }
+        }
+
+        if (notificationsToInsert.length > 0) {
+          await supabase.from('notifications').insert(notificationsToInsert);
+        }
+      } catch (notifErr) {
+        console.error('[Comments] Erro ao criar notificações:', notifErr);
+      }
+    })();
+    // --- Fim das notificações ---
+
     return NextResponse.json({ comment: data }, { status: 201 });
   } catch (err: any) {
     console.error('Comments POST error:', err);

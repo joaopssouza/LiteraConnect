@@ -17,26 +17,34 @@ export async function getOrSetServerCache<T>(
   ttlMs: number,
   producer: () => Promise<T>
 ): Promise<{ value: T; hit: boolean }> {
+  let redis = null;
+  let cached = null;
+
   try {
-    const redis = await connectRedis();
-    const cached = await redis.get(`cache:${key}`);
-
-    if (cached) {
-      return { value: JSON.parse(cached) as T, hit: true };
-    }
-
-    const value = await producer();
-    const ttlSeconds = Math.ceil(ttlMs / 1000);
-
-    await redis.setEx(`cache:${key}`, ttlSeconds, JSON.stringify(value));
-
-    return { value, hit: false };
+    redis = await connectRedis();
+    cached = await redis.get(`cache:${key}`);
   } catch (redisErr) {
-    // Se o Redis falhar, cai no producer diretamente (graceful degradation)
-    console.warn('[cache] Redis indisponível, buscando direto:', redisErr);
-    const value = await producer();
-    return { value, hit: false };
+    console.warn('[cache] Redis indisponível (GET), buscando direto:', redisErr instanceof Error ? redisErr.message : redisErr);
   }
+
+  if (cached) {
+    return { value: JSON.parse(cached) as T, hit: true };
+  }
+
+  // O produtor roda FORA do try/catch do Redis. 
+  // Se falhar (ex: PGRST002), o erro sobe e não é tratado como falha de cache.
+  const value = await producer();
+  const ttlSeconds = Math.ceil(ttlMs / 1000);
+
+  if (redis) {
+    try {
+      await redis.setEx(`cache:${key}`, ttlSeconds, JSON.stringify(value));
+    } catch (redisErr) {
+      console.warn('[cache] Redis indisponível (SET):', redisErr instanceof Error ? redisErr.message : redisErr);
+    }
+  }
+
+  return { value, hit: false };
 }
 
 /**

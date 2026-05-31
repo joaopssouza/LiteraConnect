@@ -23,7 +23,8 @@ O coração do consumo de conteúdo da plataforma. Responsável por orquestrar a
    - Apenas status `published`.
    - Ignora posts cujo `scheduled_at` seja no futuro.
    - Mostra posts `public` de todos ou `unlisted` se o post pertencer ao próprio usuário.
-4. Calcula se há mais itens (`hasMore`) e devolve o `nextCursor`.
+4. **Comentários Inline:** Para posts exclusivamente de texto (sem anexos de mídia ou capa de livro), busca os 3 comentários principais mais recentes, incluindo a contagem de likes, se o usuário curtiu (`liked_by_me`), e o número de respostas (`replies_count`), embutindo tudo no objeto do post a ser cacheado no Redis.
+5. Calcula se há mais itens (`hasMore`) e devolve o `nextCursor`.
 
 ### Respostas
 - `200 OK`: 

@@ -63,7 +63,7 @@ export function UserSuggestions({ title = 'Pessoas para seguir' }: { title?: str
             const bScore = alreadyFollowing.has(b.id) ? 1 : 0;
             return aScore - bScore;
           })
-          .slice(0, 6);
+          .slice(0, 3);
 
         const nextFollowMap: FollowMap = {};
         sorted.forEach((person: SuggestedUser) => {

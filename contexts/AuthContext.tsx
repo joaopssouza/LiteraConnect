@@ -8,6 +8,7 @@ import { getLocalAvatar } from '@/lib/avatar';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  profile: any | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
 }
@@ -15,6 +16,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
+  profile: null,
   isLoading: true,
   signOut: async () => {},
 });
@@ -22,13 +24,14 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const ensureUserProfile = async (authUser: User) => {
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('users')
-        .select('id')
+        .select('*')
         .eq('id', authUser.id)
         .single();
 
@@ -37,15 +40,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const name = authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário';
         const handle = authUser.user_metadata?.handle || `user_${Math.floor(Math.random() * 1000000)}`;
         
-        await supabase.from('users').insert([
+        const { data: newData, error: insertError } = await supabase.from('users').insert([
           {
             id: authUser.id,
             name: name,
             handle: handle,
             avatar_url: authUser.user_metadata?.avatar_url || getLocalAvatar(authUser.id, 150),
-            bio: 'Olá! Estou usando o LiteraConnect para compartilhar minhas leituras.'
+            bio: 'Olá! Estou usando o LiteraConnect para compartilhar minhas leituras.',
+            birth_date: authUser.user_metadata?.birth_date ? new Date(authUser.user_metadata.birth_date).toISOString().split('T')[0] : null,
+            gender: authUser.user_metadata?.gender || null
           }
-        ]);
+        ]).select().single();
+        
+        if (!insertError && newData) {
+          data = newData;
+        }
+      }
+      
+      if (data) {
+        setProfile(data);
       }
     } catch (err) {
       console.error('Error ensuring user profile:', err);
@@ -83,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, isLoading, signOut }}>
       {children}
     </AuthContext.Provider>
   );
