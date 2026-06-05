@@ -23,6 +23,10 @@ create_tenant_api.py
 delete_tenants.py
 describe_tenants.py
 create_rt.py
+create_*.py
+alter_*.py
+update_*.py
+remove_*.py
 
 # Pacotes de deploy e backups
 deploy*.tar.gz
@@ -31,4 +35,3 @@ profile.tar
 
 # Diretórios locais temporários
 appDataDir/
-
