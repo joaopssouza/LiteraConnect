@@ -274,10 +274,10 @@ services:
       DB_HOST: supabase_db
       DB_PORT: 5432
       DB_USER: supabase_admin
-      DB_PASSWORD: "HoSSo0Q45SA+bNACEC2UNw=="
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB:-postgres}
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
-      DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtimesecret}
+      # DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtimesecret}
       API_JWT_SECRET: "KrVxFzry97YoLDW32nqbUFTZb1sm4VBPrCduC1roqULghckEOc7kP+c37oar3tUfaSb4pdXSE3sfksCVzQbDTQ=="
       METRICS_JWT_SECRET: "KrVxFzry97YoLDW32nqbUFTZb1sm4VBPrCduC1roqULghckEOc7kP+c37oar3tUfaSb4pdXSE3sfksCVzQbDTQ=="
       FLY_ALLOC_ID: fly123
