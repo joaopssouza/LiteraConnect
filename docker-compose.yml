@@ -274,7 +274,7 @@ services:
       DB_HOST: supabase_db
       DB_PORT: 5432
       DB_USER: supabase_admin
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_PASSWORD: "HoSSo0Q45SA+bNACEC2UNw=="
       DB_NAME: ${POSTGRES_DB:-postgres}
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtimesecret}
