@@ -5,6 +5,8 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar';
 import { Toaster } from 'sonner';
+import LGPDConsentBanner from '@/components/LGPDConsentBanner';
+import Footer from '@/components/Footer';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://literaconnect.vercel.app';
 const APP_NAME = 'LiteraConnect';
@@ -81,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 aria-label="Conteúdo principal"
               >
                 {children}
+                <Footer />
               </main>
             </div>
           </AuthProvider>
@@ -91,6 +94,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Registra Service Worker apenas no client */}
         <ServiceWorkerRegistrar />
         
+        <LGPDConsentBanner />
       </body>
     </html>
   );

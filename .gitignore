@@ -12,4 +12,23 @@ certificates
 .env.server
 
 # Artefatos de runtime do Docker (gerados no servidor, não versionados)
-supabase/volumes/
+supabase/volumes/
+
+# Scripts de depuração temporários e geradores
+check_*.py
+fix_*.py
+test_*.py
+gen_tenant.py
+create_tenant_api.py
+delete_tenants.py
+describe_tenants.py
+create_rt.py
+
+# Pacotes de deploy e backups
+deploy*.tar.gz
+deploy.tar.gz
+profile.tar
+
+# Diretórios locais temporários
+appDataDir/
+

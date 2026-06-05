@@ -6,10 +6,11 @@ import { supabase } from '@/lib/supabase';
 import { PostCard } from '@/components/PostCard';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
-import { Camera, X } from 'lucide-react';
+import { Camera, X, Plus, Trash2, Edit3, BookOpen, Search, Check, Trophy, Lock } from 'lucide-react';
 import { uploadMedia } from '@/lib/supabase-storage';
 import Link from 'next/link';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import BadgeDisplay from '@/components/BadgeDisplay';
 
 type UserCard = {
   id: string;
@@ -27,8 +28,10 @@ export default function ProfileHandleClient() {
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts');
+  const [bookshelf, setBookshelf] = useState<{want_to_read: any[], reading: any[], read: any[]} | null>(null);
+  const [activeTab, setActiveTab] = useState<'posts' | 'saved' | 'bookshelf'>('posts');
   const [isLoadingSavedPosts, setIsLoadingSavedPosts] = useState(false);
+  const [isLoadingBookshelf, setIsLoadingBookshelf] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
@@ -46,6 +49,19 @@ export default function ProfileHandleClient() {
   const [followingList, setFollowingList] = useState<UserCard[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Estados da Fase 7: Metas de Leitura e Adição de Livros
+  const [goal, setGoal] = useState<any>(null);
+  const [isLoadingGoal, setIsLoadingGoal] = useState(false);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [editGoalTarget, setEditGoalTarget] = useState(12);
+  const [isSavingGoal, setIsSavingGoal] = useState(false);
+
+  const [isAddBookModalOpen, setIsAddBookModalOpen] = useState(false);
+  const [bookSearchQuery, setBookSearchQuery] = useState('');
+  const [isSearchingBooks, setIsSearchingBooks] = useState(false);
+  const [bookSearchResults, setBookSearchResults] = useState<any[]>([]);
+  const [bookToRemove, setBookToRemove] = useState<string | null>(null);
+
   useEffect(() => {
     if (handle) {
       fetchProfileAndPosts();
@@ -60,8 +76,138 @@ export default function ProfileHandleClient() {
   useEffect(() => {
     if (activeTab === 'saved' && currentUser?.id === profile?.id) {
       fetchSavedPosts();
+    } else if (activeTab === 'bookshelf' && profile?.id) {
+      fetchBookshelf();
+      fetchGoal();
     }
   }, [activeTab, currentUser?.id, profile?.id]);
+
+  const fetchBookshelf = async () => {
+    if (!profile) return;
+    setIsLoadingBookshelf(true);
+    try {
+      const res = await fetch(`/api/profile/bookshelf/${profile.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBookshelf(data);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar estante:', error);
+    } finally {
+      setIsLoadingBookshelf(false);
+    }
+  };
+
+  const fetchGoal = async () => {
+    if (!profile) return;
+    setIsLoadingGoal(true);
+    try {
+      const res = await fetch('/api/profile/goals');
+      if (res.ok) {
+        const data = await res.json();
+        setGoal(data.goal);
+        setEditGoalTarget(data.goal?.target_books || 12);
+      }
+    } catch (e) {
+      console.error('Erro ao buscar meta:', e);
+    } finally {
+      setIsLoadingGoal(false);
+    }
+  };
+
+  const saveGoal = async () => {
+    setIsSavingGoal(true);
+    try {
+      const res = await fetch('/api/profile/goals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetBooks: editGoalTarget })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGoal(data.goal);
+        setIsGoalModalOpen(false);
+      } else {
+        alert('Erro ao salvar meta.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao salvar meta.');
+    } finally {
+      setIsSavingGoal(false);
+    }
+  };
+
+  const updateBookStatus = async (bookId: string, status: string) => {
+    try {
+      const res = await fetch('/api/profile/bookshelf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId, status })
+      });
+      if (res.ok) {
+        await fetchBookshelf();
+        await fetchGoal();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const confirmRemoveBook = async () => {
+    if (!bookToRemove) return;
+    const bookId = bookToRemove;
+    setBookToRemove(null);
+    try {
+      const res = await fetch(`/api/profile/bookshelf?bookId=${bookId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        await fetchBookshelf();
+        await fetchGoal();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleBookSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bookSearchQuery.trim() || bookSearchQuery.length < 2) return;
+    setIsSearchingBooks(true);
+    try {
+      const res = await fetch(`/api/books/search?q=${encodeURIComponent(bookSearchQuery)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBookSearchResults(data.results || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearchingBooks(false);
+    }
+  };
+
+  const handleAddBookToBookshelf = async (bookId: string, status: string) => {
+    try {
+      const res = await fetch('/api/profile/bookshelf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId, status })
+      });
+      if (res.ok) {
+        setIsAddBookModalOpen(false);
+        setBookSearchQuery('');
+        setBookSearchResults([]);
+        await fetchBookshelf();
+        await fetchGoal();
+      } else {
+        alert('Erro ao adicionar livro.');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchProfileAndPosts = async () => {
     setLoading(true);
@@ -432,6 +578,12 @@ export default function ProfileHandleClient() {
               <strong className="text-[var(--text-main)] font-bold">{followersCount}</strong> Seguidores
             </button>
           </div>
+
+          {/* Gamificação: Conquistas (Badges) */}
+          <div className="mt-6 pt-4 border-t border-[var(--border)]/40">
+            <h3 className="text-xs font-bold text-brand-2 uppercase tracking-widest mb-3">Conquistas</h3>
+            <BadgeDisplay userId={profile.id} compact={true} />
+          </div>
         </div>
       </div>
 
@@ -458,12 +610,164 @@ export default function ProfileHandleClient() {
             >
               Salvos
             </button>
+            <button
+              onClick={() => setActiveTab('bookshelf')}
+              className={`py-4 text-sm font-bold border-b-2 transition-all ${
+                activeTab === 'bookshelf'
+                  ? 'border-brand-2 text-[var(--text-main)]'
+                  : 'border-transparent text-[var(--text-main)]/40 hover:text-[var(--text-main)]'
+              }`}
+            >
+              Estante
+            </button>
           </div>
         </div>
       )}
 
-      <div className="divide-y divide-[var(--border)]">
-        {isShowingSaved && isLoadingSavedPosts ? (
+      {profile.is_private && !isOwnProfile && !isFollowing ? (
+        <div className="p-16 flex flex-col items-center justify-center text-center bg-[var(--surface)] mt-4 rounded-xl mx-6 border border-[var(--border)]">
+          <Lock className="w-16 h-16 text-[var(--text-main)]/20 mb-4" />
+          <h3 className="text-xl font-bold text-[var(--text-main)] mb-2">Esta conta é privada</h3>
+          <p className="text-sm text-[var(--text-main)]/60 max-w-sm">
+            Siga {profile.name} para ver suas fotos, resenhas, estante de livros e muito mais.
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-[var(--border)]">
+        {activeTab === 'bookshelf' ? (
+          isLoadingBookshelf ? (
+            <div className="p-12 text-center text-[var(--text-main)]/40 font-medium italic">Carregando estante...</div>
+          ) : bookshelf ? (
+            <div className="p-6">
+              
+              {/* Barra de Progresso da Meta de Leitura */}
+              {goal && (
+                <div className="bg-[var(--surface)] p-6 rounded-2xl border border-[var(--border)] mb-6 shadow-sm">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                    <div>
+                      <h3 className="text-lg font-serif font-bold text-[var(--text-main)] flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-brand-2" /> Meta de Leitura {goal.goal_year}
+                      </h3>
+                      <p className="text-xs text-[var(--text-main)]/60 mt-0.5">
+                        Você leu {goal.current_books} de {goal.target_books} livros.
+                      </p>
+                    </div>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => { setEditGoalTarget(goal.target_books); setIsGoalModalOpen(true); }}
+                        className="text-xs font-bold text-brand-2 hover:underline flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Ajustar Meta
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="w-full bg-[var(--border)]/20 h-3 rounded-full overflow-hidden relative border border-[var(--border)]/10">
+                    <div 
+                      className="bg-gradient-to-r from-brand-2 to-[#8b5cf6] h-full rounded-full transition-all duration-1000 shadow-md"
+                      style={{ width: `${Math.min(100, Math.round((goal.current_books / goal.target_books) * 100))}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between items-center mt-2 text-[10px] font-bold text-[var(--text-main)]/40 uppercase tracking-wider">
+                    <span>Começo</span>
+                    <span>{Math.min(100, Math.round((goal.current_books / goal.target_books) * 100))}% concluído</span>
+                    <span>Objetivo</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Botão de Adicionar Livro */}
+              {isOwnProfile && (
+                <div className="flex justify-end mb-6">
+                  <button
+                    onClick={() => setIsAddBookModalOpen(true)}
+                    className="flex items-center gap-1.5 px-5 py-2.5 bg-brand-2 text-white text-sm font-bold rounded-xl hover:opacity-90 shadow-lg transition-all active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" /> Adicionar Livro
+                  </button>
+                </div>
+              )}
+
+              {/* Categorias da Estante */}
+              <div className="space-y-8">
+                {['reading', 'want_to_read', 'read'].map((status) => {
+                  const books = bookshelf[status as keyof typeof bookshelf];
+                  if (!books || books.length === 0) return null;
+                  const statusLabel = status === 'reading' ? 'Lendo Atualmente' : status === 'want_to_read' ? 'Quero Ler' : 'Lidos';
+                  
+                  return (
+                    <div key={status}>
+                      <h3 className="text-lg font-serif font-bold text-[var(--text-main)] mb-4 border-b border-[var(--border)] pb-2">{statusLabel}</h3>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                        {books.map((book: any) => (
+                          <div key={book.id} className="relative group rounded-lg overflow-hidden">
+                            <div className="relative aspect-[2/3] w-full bg-[var(--border)]/20 rounded-lg overflow-hidden shadow-sm">
+                              {book.thumbnail ? (
+                                <Image src={book.thumbnail} alt={book.title} fill className="object-cover" unoptimized />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center p-2 text-center text-xs">
+                                  {book.title}
+                                </div>
+                              )}
+                              
+                              {/* Overlay de Ações no Hover */}
+                              {isOwnProfile && (
+                                <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-center">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setBookToRemove(book.id); }}
+                                    className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors active:scale-90"
+                                    title="Remover da estante"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <div className="flex flex-col gap-1 w-full mt-1.5">
+                                    {book.status !== 'reading' && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); updateBookStatus(book.id, 'reading'); }}
+                                        className="text-[9px] bg-brand-2 hover:bg-brand-2/95 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
+                                      >
+                                        Lendo
+                                      </button>
+                                    )}
+                                    {book.status !== 'want_to_read' && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); updateBookStatus(book.id, 'want_to_read'); }}
+                                        className="text-[9px] bg-zinc-600 hover:bg-zinc-700 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
+                                      >
+                                        Quero Ler
+                                      </button>
+                                    )}
+                                    {book.status !== 'read' && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); updateBookStatus(book.id, 'read'); }}
+                                        className="text-[9px] bg-green-600 hover:bg-green-700 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
+                                      >
+                                        Lido
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-2 px-0.5">
+                              <p className="text-xs font-bold text-[var(--text-main)] line-clamp-1">{book.title}</p>
+                              <p className="text-[10px] text-[var(--text-main)]/60 line-clamp-1">{book.authors?.join(', ')}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {(!bookshelf.reading.length && !bookshelf.want_to_read.length && !bookshelf.read.length) && (
+                <div className="p-12 text-center text-[var(--text-main)]/40 font-medium italic">Esta estante está vazia. Comece a adicionar livros!</div>
+              )}
+            </div>
+          ) : (
+            <div className="p-12 text-center text-[var(--text-main)]/40 font-medium italic">Estante indisponível.</div>
+          )
+        ) : isShowingSaved && isLoadingSavedPosts ? (
           <div className="p-12 text-center text-[var(--text-main)]/40 font-medium italic">Carregando posts salvos...</div>
         ) : visiblePosts.length > 0 ? (
           visiblePosts.map((post) => (
@@ -496,6 +800,165 @@ export default function ProfileHandleClient() {
           </div>
         )}
       </div>
+      )}
+
+      {/* Modal de Ajustar Meta de Leitura */}
+        {isGoalModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-sm bg-[var(--surface)] rounded-3xl shadow-2xl border border-[var(--border)] overflow-hidden">
+              <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+                <h3 className="font-bold text-[var(--text-main)] text-lg flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-brand-2" /> Ajustar Meta Anual
+                </h3>
+                <button onClick={() => setIsGoalModalOpen(false)} className="p-2 rounded-full hover:bg-[var(--border)]/50 transition-colors">
+                  <X className="w-4 h-4 text-[var(--text-main)]" />
+                </button>
+              </div>
+              <div className="p-6">
+                <label className="text-xs font-bold text-brand-2 uppercase tracking-widest">Meta de Livros lidos</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={editGoalTarget}
+                  onChange={(e) => setEditGoalTarget(parseInt(e.target.value, 10) || 1)}
+                  className="w-full mt-2 bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30 transition-all font-bold text-center text-lg"
+                />
+                <p className="text-xs text-[var(--text-main)]/50 mt-3 text-center">
+                  Defina um objetivo saudável para este ano. A meta padrão é 12.
+                </p>
+              </div>
+              <div className="p-4 bg-[var(--border)]/5 border-t border-[var(--border)] flex justify-end gap-3">
+                <button
+                  onClick={() => setIsGoalModalOpen(false)}
+                  className="px-5 py-2 rounded-full font-bold text-sm text-[var(--text-main)]/60 hover:bg-[var(--border)]/10 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveGoal}
+                  disabled={isSavingGoal}
+                  className="px-6 py-2 rounded-full bg-brand-2 text-white font-bold text-sm hover:opacity-90 shadow-lg disabled:opacity-40 transition-all active:scale-95"
+                >
+                  {isSavingGoal ? 'Salvando...' : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Adicionar Livro à Estante */}
+        {isAddBookModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-lg bg-[var(--surface)] rounded-3xl shadow-2xl border border-[var(--border)] overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+                <h3 className="font-bold text-[var(--text-main)] text-xl flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-brand-2" /> Adicionar Livro à Estante
+                </h3>
+                <button onClick={() => { setIsAddBookModalOpen(false); setBookSearchResults([]); setBookSearchQuery(''); }} className="p-2 rounded-full hover:bg-[var(--border)]/50 transition-colors">
+                  <X className="w-5 h-5 text-[var(--text-main)]" />
+                </button>
+              </div>
+              
+              <form onSubmit={handleBookSearch} className="p-6 border-b border-[var(--border)] bg-[var(--border)]/5">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Busque pelo título, autor ou gênero..."
+                    value={bookSearchQuery}
+                    onChange={(e) => setBookSearchQuery(e.target.value)}
+                    className="flex-1 bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--text-main)] text-sm outline-none focus:ring-2 focus:ring-brand-2/30 transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearchingBooks || bookSearchQuery.trim().length < 2}
+                    className="px-5 py-2.5 bg-brand-2 text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-40 flex items-center gap-1 active:scale-95"
+                  >
+                    {isSearchingBooks ? <span className="animate-spin">⌛</span> : <Search className="w-4 h-4" />} Buscar
+                  </button>
+                </div>
+              </form>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {bookSearchResults.length > 0 ? (
+                  bookSearchResults.map((book) => (
+                    <div key={book._id} className="flex gap-4 p-3 bg-[var(--bg-main)]/50 border border-[var(--border)] rounded-2xl items-center hover:bg-[var(--border)]/10 transition-colors">
+                      <div className="relative w-14 aspect-[2/3] bg-[var(--border)]/20 rounded-md overflow-hidden flex-shrink-0 shadow-sm">
+                        {book.thumbnail ? (
+                          <Image src={book.thumbnail} alt="" fill className="object-cover" unoptimized />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[10px] text-center p-1">Sem capa</div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-[var(--text-main)] text-sm truncate">{book.title}</h4>
+                        <p className="text-xs text-[var(--text-main)]/60 truncate">{book.authors?.join(', ') || 'Autor desconhecido'}</p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleAddBookToBookshelf(book._id, 'want_to_read')}
+                          className="px-2.5 py-1.5 bg-zinc-700 hover:bg-zinc-800 text-[10px] font-bold text-white rounded-lg transition-all active:scale-95"
+                        >
+                          Quero Ler
+                        </button>
+                        <button
+                          onClick={() => handleAddBookToBookshelf(book._id, 'reading')}
+                          className="px-2.5 py-1.5 bg-brand-2 hover:bg-brand-2/90 text-[10px] font-bold text-white rounded-lg transition-all active:scale-95"
+                        >
+                          Lendo
+                        </button>
+                        <button
+                          onClick={() => handleAddBookToBookshelf(book._id, 'read')}
+                          className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-[10px] font-bold text-white rounded-lg transition-all active:scale-95"
+                        >
+                          Lido
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : isSearchingBooks ? (
+                  <div className="p-8 text-center text-sm text-[var(--text-main)]/50 italic">Pesquisando catálogo...</div>
+                ) : bookSearchQuery.trim() ? (
+                  <div className="p-8 text-center text-sm text-[var(--text-main)]/50 italic">Nenhum livro correspondente encontrado.</div>
+                ) : (
+                  <div className="p-8 text-center text-sm text-[var(--text-main)]/40 font-medium italic">Digite para buscar no acervo do LiteraConnect ou da API do Google Books.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Modal de Remover Livro */}
+        {bookToRemove && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-sm bg-[var(--surface)] rounded-3xl shadow-2xl border border-[var(--border)] overflow-hidden">
+              <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+                <h3 className="font-bold text-[var(--text-main)] text-lg flex items-center gap-2">
+                  <Trash2 className="w-5 h-5 text-red-500" /> Remover da Estante
+                </h3>
+                <button onClick={() => setBookToRemove(null)} className="p-2 rounded-full hover:bg-[var(--border)]/50 transition-colors">
+                  <X className="w-4 h-4 text-[var(--text-main)]" />
+                </button>
+              </div>
+              <div className="p-6">
+                <p className="text-sm text-[var(--text-main)]/80">Deseja realmente remover este livro da sua estante?</p>
+              </div>
+              <div className="p-4 bg-[var(--border)]/5 border-t border-[var(--border)] flex justify-end gap-3">
+                <button
+                  onClick={() => setBookToRemove(null)}
+                  className="px-5 py-2 rounded-full font-bold text-sm text-[var(--text-main)]/60 hover:bg-[var(--border)]/10 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmRemoveBook}
+                  className="px-6 py-2 rounded-full bg-red-600 text-white font-bold text-sm hover:opacity-90 shadow-lg transition-all active:scale-95"
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">

@@ -32,7 +32,7 @@ export async function GET(request: Request) {
         },
       }
     )
-    
+
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     const isLocalEnv = process.env.NODE_ENV === 'development'
     // Em produção, a variável NEXT_PUBLIC_SUPABASE_URL já aponta pro domínio principal (ex: https://literaconnect.jpdev.uk)
@@ -42,6 +42,15 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${baseUrl}${next}`)
     } else {
       console.error('[Auth Callback] Erro ao trocar código por sessão:', error)
+
+      // Fallback para double-requests (Next.js prefetch ou modo estrito)
+      // Se o código já foi consumido na primeira request, a sessão já existe.
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        console.log('[Auth Callback] Sessão já existe (possível double request). Redirecionando com sucesso.')
+        return NextResponse.redirect(`${baseUrl}${next}`)
+      }
+
       return NextResponse.redirect(`${baseUrl}/login?error=auth_failed&reason=${encodeURIComponent(error.message)}`)
     }
   }

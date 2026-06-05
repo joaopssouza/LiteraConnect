@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-utils';
-import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 
 // GET — lista comentários de um post (paginado por cursor)
 export async function GET(request: Request) {
@@ -53,10 +52,6 @@ export async function POST(request: Request) {
   if (isAuthError(auth)) return auth;
 
   const { user, supabase } = auth;
-
-  // Rate limit: 30 comentários por minuto por usuário
-  const rl = await checkRateLimit(`comments:${user.id}`, 30, 60);
-  if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
   try {
     const body = await request.json();

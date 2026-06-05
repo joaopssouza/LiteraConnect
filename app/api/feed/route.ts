@@ -35,6 +35,10 @@ export async function GET(request: Request) {
       const { data: blocks } = await supabase.from('user_blocks').select('blocked_id').eq('blocker_id', userId);
       const blockedIds = blocks?.map((b: any) => b.blocked_id) || [];
 
+      // Pega preferências do usuário
+      const { data: prefs } = await supabase.from('user_preferences').select('favorite_categories').eq('user_id', userId).single();
+      const favoriteCategories = prefs?.favorite_categories || [];
+
       let query = supabase
         .from('posts')
         .select(
@@ -74,6 +78,25 @@ export async function GET(request: Request) {
         likes_count: post.likes?.[0]?.count ?? 0,
         comments_count: post.comments?.[0]?.count ?? 0,
       }));
+
+      // Aplica priorização por preferências (scoring na memória para o batch)
+      if (favoriteCategories.length > 0) {
+        rawItems.sort((a, b) => {
+          let scoreA = 0;
+          let scoreB = 0;
+          const textA = (a.content + ' ' + (a.book_title || '')).toLowerCase();
+          const textB = (b.content + ' ' + (b.book_title || '')).toLowerCase();
+          
+          for (const cat of favoriteCategories) {
+            const catLower = cat.toLowerCase();
+            if (textA.includes(catLower)) scoreA++;
+            if (textB.includes(catLower)) scoreB++;
+          }
+          
+          // Se tiverem scores diferentes, prioriza o maior. Se não, a ordem original (created_at) se mantém.
+          return scoreB - scoreA;
+        });
+      }
 
       // Enriquece views com contadores em tempo real do Redis
       let items = rawItems;

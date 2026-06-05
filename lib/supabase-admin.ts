@@ -4,5 +4,5 @@ import { createClient } from '@supabase/supabase-js';
 // O Service Role Key NUNCA deve chegar ao frontend (Next.js client-side). Utilize apenas nas API Routes ou Server Actions.
 export const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY || ''
 );

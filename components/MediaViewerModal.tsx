@@ -345,9 +345,9 @@ export function MediaViewerModal({
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex bg-black/95 backdrop-blur-md" ref={containerRef}>
-      {/* Left Side: Media Viewer (70%) */}
-      <div className="flex-[7] relative flex flex-col items-center justify-center h-full overflow-hidden" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex flex-col md:flex-row bg-black/95 backdrop-blur-md" ref={containerRef}>
+      {/* Left Side: Media Viewer (70% on desktop, 45% on mobile) */}
+      <div className="h-[45%] md:h-full w-full md:w-auto md:flex-[7] relative flex flex-col items-center justify-center overflow-hidden bg-black" onClick={onClose}>
         
         {/* Top Controls */}
         <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/60 to-transparent">
@@ -376,15 +376,15 @@ export function MediaViewerModal({
           <>
             <button 
               onClick={handlePrev}
-              className="absolute left-4 p-4 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-all hover:scale-110 z-10"
+              className="absolute left-4 p-2 md:p-4 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-all hover:scale-110 z-10"
             >
-              <ChevronLeft className="w-8 h-8" />
+              <ChevronLeft className="w-6 h-6 md:w-8 md:h-8" />
             </button>
             <button 
               onClick={handleNext}
-              className="absolute right-4 p-4 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-all hover:scale-110 z-10"
+              className="absolute right-4 p-2 md:p-4 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-all hover:scale-110 z-10"
             >
-              <ChevronRight className="w-8 h-8" />
+              <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
             </button>
           </>
         )}
@@ -418,8 +418,8 @@ export function MediaViewerModal({
         </div>
       </div>
 
-      {/* Right Side: Interaction Sidebar (30%) */}
-      <div className="flex-[3] min-w-[350px] max-w-[450px] bg-[var(--bg-main)] border-l border-[var(--border)] flex flex-col h-full shadow-2xl transition-colors duration-300" onClick={(e) => e.stopPropagation()}>
+      {/* Right Side: Interaction Sidebar (30% on desktop, 55% on mobile) */}
+      <div className="h-[55%] md:h-full w-full md:w-auto md:flex-[3] md:min-w-[350px] md:max-w-[450px] bg-[var(--bg-main)] border-t md:border-t-0 md:border-l border-[var(--border)] flex flex-col shadow-2xl transition-colors duration-300" onClick={(e) => e.stopPropagation()}>
         
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-5 custom-scrollbar text-[var(--text-main)]">

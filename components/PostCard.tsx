@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Bell, BellOff, Bookmark, Check, Eye, EyeOff, Heart, Link2, MessageCircle, Pencil, Repeat2, Share, Shield, Trash2, X, Play } from 'lucide-react';
+import { Bell, BellOff, Bookmark, Check, Eye, EyeOff, Heart, Link2, MessageCircle, Pencil, Repeat2, Share, Shield, Trash2, X, Play, Loader2 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -114,6 +114,12 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
   const [isSavingPost, setIsSavingPost] = useState(false);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
+
+  // Estados e Ref da Fase 7 (Estante Rápida nos Posts)
+  const [isSavingToShelf, setIsSavingToShelf] = useState(false);
+  const [shelfMenuOpen, setShelfMenuOpen] = useState(false);
+  const [shelfStatus, setShelfStatus] = useState<string | null>(null);
+  const shelfMenuRef = useRef<HTMLDivElement | null>(null);
 
   const [feedComments, setFeedComments] = useState<any[]>(recent_comments || []);
   const [newComment, setNewComment] = useState('');
@@ -308,6 +314,57 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!shelfMenuOpen) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (shelfMenuRef.current && !shelfMenuRef.current.contains(event.target as Node)) {
+        setShelfMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [shelfMenuOpen]);
+
+  const handleSaveToShelf = async (status: string) => {
+    if (!bookTitle) return;
+    setIsSavingToShelf(true);
+    try {
+      const resSearch = await fetch(`/api/books/search?q=${encodeURIComponent(bookTitle)}`);
+      if (!resSearch.ok) throw new Error('Livro não encontrado');
+      
+      const searchData = await resSearch.json();
+      const book = searchData.results?.[0];
+      
+      if (!book) {
+        alert('Não foi possível mapear este título a um livro do catálogo.');
+        setIsSavingToShelf(false);
+        setShelfMenuOpen(false);
+        return;
+      }
+
+      const resSave = await fetch('/api/profile/bookshelf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId: book._id, status })
+      });
+
+      if (resSave.ok) {
+        setShelfStatus(status);
+        if (onLocalPostPreferenceChange) {
+          onLocalPostPreferenceChange();
+        }
+      } else {
+        alert('Erro ao salvar livro na estante.');
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert('Erro: ' + e.message);
+    } finally {
+      setIsSavingToShelf(false);
+      setShelfMenuOpen(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -559,8 +616,61 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
                 <span className="text-[var(--text-main)]/60 text-sm">· {timeAgo}</span>
               </div>
               {bookTitle && (
-                <div className="inline-flex items-center self-start gap-1 bg-brand-2/10 px-2 py-0.5 mt-0.5 rounded-full text-xs font-medium text-brand-2 border border-brand-2/20">
-                  📚 Lendo: {bookTitle}
+                <div className="relative" ref={shelfMenuRef}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!user) {
+                        alert('Faça login para salvar livros na sua estante.');
+                        return;
+                      }
+                      setShelfMenuOpen(!shelfMenuOpen);
+                    }}
+                    className={cn(
+                      "inline-flex items-center self-start gap-1 px-2.5 py-1 mt-1 rounded-full text-xs font-bold border transition-all active:scale-95",
+                      shelfStatus 
+                        ? "bg-green-600/10 text-green-600 border-green-600/20"
+                        : "bg-brand-2/10 text-brand-2 border-brand-2/20 hover:bg-brand-2/20"
+                    )}
+                  >
+                    <span>📚 Lendo: {bookTitle}</span>
+                    {shelfStatus && <span className="ml-1 text-[9px] uppercase tracking-wider font-extrabold bg-green-600 text-white px-1.5 py-0.2 rounded-full">Na estante</span>}
+                  </button>
+
+                  {shelfMenuOpen && (
+                    <div className="absolute left-0 mt-1 w-44 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl z-30 py-1 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                      {isSavingToShelf ? (
+                        <div className="px-4 py-3 text-xs text-[var(--text-main)]/60 flex items-center gap-2">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-2" />
+                          Salvando na estante...
+                        </div>
+                      ) : (
+                        <>
+                          <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--text-main)]/40 uppercase tracking-widest border-b border-[var(--border)]/40">
+                            Salvar na Estante
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSaveToShelf('want_to_read'); }}
+                            className="w-full px-4 py-2 text-left text-xs text-[var(--text-main)] hover:bg-[var(--border)]/20 font-medium transition-colors"
+                          >
+                            Quero Ler
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSaveToShelf('reading'); }}
+                            className="w-full px-4 py-2 text-left text-xs text-[var(--text-main)] hover:bg-[var(--border)]/20 font-medium transition-colors"
+                          >
+                            Lendo
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSaveToShelf('read'); }}
+                            className="w-full px-4 py-2 text-left text-xs text-[var(--text-main)] hover:bg-[var(--border)]/20 font-medium transition-colors"
+                          >
+                            Lido
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

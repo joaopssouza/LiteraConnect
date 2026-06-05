@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-utils';
 import { invalidateServerCacheByPrefix } from '@/lib/server-cache';
-import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(req: Request) {
   // Valida JWT — user_id vem do token, nunca do body
@@ -9,10 +8,6 @@ export async function POST(req: Request) {
   if (isAuthError(auth)) return auth;
 
   const { user, supabase } = auth;
-
-  // Rate limit: 10 posts por minuto por usuário
-  const rl = await checkRateLimit(`posts:${user.id}`, 10, 60);
-  if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
   try {
     const body = await req.json();

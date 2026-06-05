@@ -135,6 +135,12 @@ services:
         paths:
           - /realtime/v1/
     plugins:
+      - name: request-transformer
+        config:
+          remove:
+            headers:
+              - cookie
+              - Cookie
       - name: cors
       - name: key-auth
         config:

@@ -18,7 +18,7 @@ volumes:
   mongo_data:
   mongo_config:
 
-# Configuração global de logs para evitar estouro de disco
+    # Configuração global de logs para evitar estouro de disco
 x-logging: &default-logging
   driver: "json-file"
   options:
@@ -53,7 +53,7 @@ services:
       - supabase_db_data:/var/lib/postgresql/data
       - ./database.sql:/docker-entrypoint-initdb.d/zz-schema.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -h 127.0.0.1 -p 5432"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -h 127.0.0.1 -p 5432" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -65,7 +65,11 @@ services:
     image: kong:3.9.1
     container_name: supabase_kong
     restart: unless-stopped
-    logging: *default-logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - db_network
       - proxy_network
@@ -75,7 +79,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1048M
           cpus: '0.30'
     environment:
       KONG_NGINX_HTTP_LARGE_CLIENT_HEADER_BUFFERS: 4 64k
@@ -91,7 +95,7 @@ services:
       supabase_db:
         condition: service_started
     healthcheck:
-      test: ["CMD", "kong", "health"]
+      test: [ "CMD", "kong", "health" ]
       interval: 15s
       timeout: 10s
       retries: 3
@@ -142,11 +146,15 @@ services:
       GOTRUE_MAILER_URLPATHS_RECOVERY: ${MAILER_URLPATHS_RECOVERY:-/auth/v1/verify}
       GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: ${MAILER_URLPATHS_EMAIL_CHANGE:-/auth/v1/verify}
       GOTRUE_RATE_LIMIT_HEADER: X-Forwarded-For
+      GOTRUE_MAILER_EXTERNAL_HOSTS: "literaconnect.jpdev.uk"
+      GOTRUE_MAILER_TEMPLATES_CONFIRMATION: /etc/gotrue/templates/confirmation.html
+    volumes:
+      - ./supabase/templates:/etc/gotrue/templates
     depends_on:
       supabase_db:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -240,7 +248,7 @@ services:
     volumes:
       - supabase_storage_data:/var/lib/storage:ro
     healthcheck:
-      test: ["CMD", "imgproxy", "health"]
+      test: [ "CMD", "imgproxy", "health" ]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -255,6 +263,7 @@ services:
     logging: *default-logging
     networks:
       - db_network
+      - proxy_network
     deploy:
       resources:
         limits:
@@ -303,6 +312,9 @@ services:
     environment:
       HOSTNAME: 0.0.0.0
       STUDIO_PG_META_URL: http://supabase_meta:8080
+      POSTGRES_HOST: supabase_db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION:-LiteraConnect}
       DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT:-LiteraConnect}
@@ -311,11 +323,12 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
       AUTH_JWT_SECRET: ${JWT_SECRET}
+      EDGE_FUNCTIONS_MANAGEMENT_FOLDER: /app
     depends_on:
       supabase_meta:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/profile"]
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/profile" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -361,16 +374,11 @@ services:
           memory: 256M
           cpus: '0.20'
     command: >
-      redis-server
-      --save 60 1
-      --save 300 10
-      --loglevel warning
-      --maxmemory 128mb
-      --maxmemory-policy allkeys-lru
+      redis-server --save 60 1 --save 300 10 --loglevel warning --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -398,7 +406,7 @@ services:
       - mongo_data:/data/db
       - mongo_config:/data/configdb
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.runCommand({ ping: 1 })"]
+      test: [ "CMD", "mongosh", "--eval", "db.runCommand({ ping: 1 })" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -423,8 +431,8 @@ services:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USER:-admin}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD}
       ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USER:-admin}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+      ME_CONFIG_BASICAUTH: "false"
+      ME_CONFIG_BASICAUTH_ENABLED: "false"
     depends_on:
       mongo:
         condition: service_healthy
@@ -451,7 +459,7 @@ services:
       resources:
         limits:
           memory: 1.5G
-          cpus: '0.80'
+          cpus: '1.00'
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
@@ -462,6 +470,7 @@ services:
       MONGODB_URI: mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017/literaconnect?authSource=admin
       CRON_SECRET: ${CRON_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      INTERNAL_SECURITY_SECRET: ${INTERNAL_SECURITY_SECRET}
     depends_on:
       supabase_db:
         condition: service_started
@@ -495,6 +504,4 @@ services:
       ofelia.job-exec.consolidate-views.schedule: "@every 6h"
       ofelia.job-exec.consolidate-views.container: "nextjs"
       ofelia.job-exec.consolidate-views.command: >
-        sh -c 'curl -s -X POST http://localhost:3000/api/cron/consolidate-views
-        -H "Authorization: Bearer ${CRON_SECRET}"
-        -H "Content-Type: application/json"'
+        sh -c 'curl -s -X POST http://localhost:3000/api/cron/consolidate-views -H "Authorization: Bearer ${CRON_SECRET}" -H "Content-Type: application/json"'

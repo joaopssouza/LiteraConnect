@@ -57,5 +57,46 @@ Este é o plano de entrega do LiteraConnect, atualizado para refletir a nossa ar
     - **Badges/Conquistas:** `GET /api/badges/:userId` (MongoDB + cache Redis), 7 tipos de badges (Primeira Resenha, Leitor Assíduo, Crítico, Influenciador, Pioneiro, Autor Querido, Conector). Componente `BadgeDisplay` (modo compacto com tooltip + modo grid completo).
     - **Cron Job:** `GET /api/cron/award-badges` (a cada 6h no Vercel) — verifica critérios e insere badges no MongoDB + notificação Supabase.
     - **(Pendente)** Sistema de gorjetas (Stripe) e posts exclusivos/premium.
+
+## Fase 7: Onboarding, Identidade Literária e Gamificação Avançada
+
+- [ ] ⏳ **Sprint 19 — Integração Google Books API e Catálogo (Backend):**
+  - **Client da API Google:** Criação do serviço `GoogleBooksService` no backend. A chave da API será consumida estritamente via `process.env.GOOGLE_BOOKS_API_KEY` no servidor local.
+  - **Modelagem no MongoDB Local:** Criação do schema de validação para a coleção `books_catalog`, mapeando os campos `volumeInfo` (título, autores, thumbnail, ISBN).
+  - **Background Worker (Ofelia/Cron):** Implementação de uma rotina local que consome as categorias mais populares da Google Books API e faz o *upsert* no MongoDB local, garantindo um acervo base para o onboarding.
+  - **Cache de Alta Performance:** Injeção dos top livros de cada categoria no Redis local para acesso sub-milissegundo durante o fluxo de novos cadastros.
+
+- [ ] ⏳ **Sprint 20 — Onboarding Interativo (UX Netflix Style):**
+  - **Middleware de Interceptação:** Verificação no `middleware.ts` para checar se a coluna de preferências no Supabase (PostgreSQL) está preenchida. Se não, redireciona o aluno para `/onboarding`.
+  - **Step 1 (Categorias):** Interface fluida exibindo os gêneros literários (alimentada estritamente pelo Redis local).
+  - **A Cortina de Fumaça (UI):** Implementação de animações de *Skeleton Loading* com Framer Motion durante a transição de telas, mascarando latências de rede.
+  - **Step 2 (Seleção de Obras):** Renderização da grade de capas de livros (`volumeInfo.imageLinks.thumbnail`) para o aluno escolher suas referências.
+
+- [ ] ⏳ **Sprint 21 — Busca Híbrida e Persistência de Perfil:**
+  - **Busca em Tempo Real (`/api/books/search`):** Endpoint de busca inteligente. O backend busca primeiro no `books_catalog` do MongoDB local ➔ Se não encontrar, consulta a Google Books API, salva o resultado no MongoDB (Cache-Aside) e devolve ao frontend.
+  - **Persistência de Preferências:** Salvamento final dos interesses na tabela `user_preferences` do Supabase local.
+  - **Refatoração do Feed:** Injeção das preferências do usuário no algoritmo da `Feed API` para priorizar postagens de gêneros correlatos.
+
+- [ ] ⏳ **Sprint 22 — Identidade Literária (Estante Virtual):**
+  - **Modelagem Relacional:** Criação da tabela `user_bookshelf` no Supabase (PostgreSQL), com chaves estrangeiras para `users.id` e `books_catalog.isbn`, contendo o status (`reading`, `read`, `want_to_read`).
+  - **Expansão da Profile API:** Atualização do endpoint `/api/profile` para carregar e expor as três seções da estante virtual na página de perfil público do usuário.
+  - **Integração Frontend:** Criação de componentes UI para gerenciar o status dos livros diretamente pelo perfil.
+
+- [ ] ⏳ **Sprint 23 — Matchmaking Social (Conexões Inteligentes):**
+  - **Algoritmo de Similaridade:** Criação do endpoint `/api/recommendations/users` que cruza os vetores de interesses (gêneros e ISBNs) da tabela `user_preferences` entre os alunos.
+  - **Orquestração com Redis:** Processamento em lote das similaridades rodando periodicamente e salvando o "score de match" no Redis local para garantir que a consulta da UI seja instantânea.
+  - **UI de Descoberta:** Implementação de um carrossel "Leitores com gostos similares" na tela de Explorar, integrado com a `Follow API` existente para estimular conexões.
+
+- [ ] ⏳ **Sprint 24 — Metas Anuais de Leitura e Gamificação:**
+  - **Gestão de Metas:** Criação da tabela `reading_goals` (ex: meta_ano: 2026, target: 12 livros) e endpoints para o usuário definir e acompanhar seu progresso na interface.
+  - **Trigger de Progresso:** Sempre que um livro na `user_bookshelf` mudar para o status `read` (Sprint 22), um evento assíncrono atualiza a barra de progresso da meta anual.
+  - **Integração com Badges:** Atualização do Cron Job local (`/api/cron/award-badges`). O job passará a avaliar se a meta foi atingida. Caso positivo, emite uma nova conquista (Badge) e dispara uma notificação de parabenização via Supabase Realtime.
+
+## Fase 8: Live Ao-Vivo.
+---
+
+### Observações de Arquitetura e Engenharia:
+Ao planejar essas sprints, certifique-se de que os novos endpoints mantenham o padrão atual do projeto: validação rigorosa de tokens JWT nas camadas intermediárias e limitação de taxa (Rate Limiting) no Redis para evitar sobrecarga no banco relacional durante o Matchmaking (Sprint 23). Todo schema novo no Supabase deverá ser versionado utilizando *migrations* SQL.
+
 ---
 *Voltar para: [[00_LiteraConnect_Home]]*

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirme seu e-mail no LiteraConnect</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f9fafb;
+      margin: 0;
+      padding: 0;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background-color: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .header {
+      background-color: #f59e0b; /* amber-500 */
+      padding: 30px 20px;
+      text-align: center;
+      color: white;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .content {
+      padding: 40px 30px;
+      text-align: left;
+      line-height: 1.6;
+    }
+    .content h2 {
+      margin-top: 0;
+      color: #111827;
+      font-size: 20px;
+    }
+    .content p {
+      margin: 0 0 20px 0;
+      color: #4b5563;
+    }
+    .button-container {
+      text-align: center;
+      margin: 30px 0;
+    }
+    .button {
+      display: inline-block;
+      background-color: #f59e0b;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+    }
+    .token-box {
+      background-color: #f3f4f6;
+      border: 1px dashed #d1d5db;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .token-box strong {
+      font-size: 24px;
+      letter-spacing: 4px;
+      color: #1f2937;
+    }
+    .token-box p {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+    }
+    .footer {
+      background-color: #f9fafb;
+      padding: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #9ca3af;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
+    .footer a {
+      color: #6b7280;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>LiteraConnect</h1>
+    </div>
+    <div class="content">
+      <h2>Confirme seu endereço de e-mail</h2>
+      <p>Olá,</p>
+      <p>Obrigado por se juntar à maior comunidade literária! Para concluir o seu cadastro e garantir a segurança da sua conta, por favor, confirme seu endereço de e-mail clicando no botão abaixo:</p>
+      
+      <div class="button-container">
+        <a href="{{ .ConfirmationURL }}" class="button" style="color: white;">Confirmar meu e-mail</a>
+      </div>
+
+      <p>Se você preferir inserir um código manualmente no aplicativo, utilize o código abaixo:</p>
+      
+      <div class="token-box">
+        <p>Seu código de verificação:</p>
+        <strong>{{ .Token }}</strong>
+      </div>
+
+      <p>Se você não solicitou este e-mail, pode ignorá-lo com segurança. O seu e-mail não será ativado.</p>
+      <p>Um abraço,<br>Equipe LiteraConnect</p>
+    </div>
+    <div class="footer">
+      <p>© 2026 LiteraConnect. Todos os direitos reservados.</p>
+      <p>Se tiver dúvidas, visite nossa <a href="https://literaconnect.jpdev.uk/suporte/ajuda">Central de Ajuda</a>.</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,12 +1,16 @@
 # Backend e APIs (Next.js)
 
-O backend do LiteraConnect vive dentro da pasta `app/api/` e utiliza o ecossistema Serverless do Next.js (App Router).
+O backend do LiteraConnect vive dentro da pasta `app/api/` e utiliza o ecossistema Serverless-like via Next.js (App Router), empacotado como uma aplicação **standalone** no Docker.
 
 ## Segurança Global e Auth
 - Validação de sessão estrita via SSR com `@supabase/ssr` (`auth.getUser()`).
 - Tokens JWT validados no servidor antes de autorizar qualquer transação.
 - O `userId` é *sempre* extraído do token, nunca de payloads ou query strings, prevenindo ataques de personificação.
-- **Rate Limiting (Edge Middleware):** Proteção contra abusos (DDoS/Spam) via algoritmo **Token Bucket** usando `@upstash/ratelimit` e Redis. Limite de 30 requisições (burst) com recarga de 30 tokens a cada 10 segundos. Utiliza `ephemeralCache` e mapeamento híbrido (ID do JWT com fallback seguro para IP via `x-forwarded-for`).
+- **Rate Limiting:** Proteção contra abusos (DDoS/Spam) via algoritmo **Token Bucket** usando a instância local do Redis. Limite de 30 requisições (burst) com recarga de 30 tokens a cada 10 segundos. Utiliza `ephemeralCache` e mapeamento híbrido (ID do JWT com fallback seguro para IP via `x-forwarded-for`).
+
+## Tarefas em Segundo Plano (Cron Jobs)
+- Na nova arquitetura, as rotas de cron (ex: `/api/cron/consolidate-views`) são acionadas de forma autônoma pelo **Ofelia**, um agendador de tarefas Dockerizado.
+- O Ofelia é responsável por fazer requisições cURL programadas, com as devidas chaves de segurança (`CRON_SECRET`), batendo na interface de rede interna do contêiner do Next.js sem exposição ao ambiente externo.
 
 ## Rotas Principais (Endpoints)
 
@@ -27,12 +31,12 @@ O backend do LiteraConnect vive dentro da pasta `app/api/` e utiliza o ecossiste
 
 ### `/api/drafts`
 - **Métodos:** `POST`, `PUT`
-- **Função:** Interface direta e segura com o **MongoDB**.
+- **Função:** Interface direta e segura com a base local do **MongoDB**.
   - `POST`: Cria um novo rascunho (`insertOne`).
   - `PUT`: Atualiza o conteúdo rico de um rascunho existente (`updateOne`), garantindo que apenas o autor (`user.id`) possa modificar.
 
 ### `/api/feed` (e derivadas)
-- **Função Estratégica:** Orquestração Híbrida. Essa API busca metadados e permissões no Supabase, consulta o "corpo" no MongoDB, e tenta servir tudo prioritariamente a partir do cache quente no Redis.
+- **Função Estratégica:** Orquestração Híbrida. Essa API busca metadados e permissões no Supabase (PostgreSQL), consulta o "corpo" no MongoDB, e tenta servir tudo prioritariamente a partir do cache quente alocado na instância do Redis local.
 
 ---
 *Voltar para: [[00_LiteraConnect_Home]]*

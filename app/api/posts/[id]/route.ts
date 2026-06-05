@@ -3,12 +3,16 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Remove global client instantiation to avoid build errors if env vars are missing
+// const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
-
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(supabaseUrl, supabaseServiceKey);
+}
 
 async function deleteSupabaseMedia(url: string) {
   try {
@@ -19,6 +23,7 @@ async function deleteSupabaseMedia(url: string) {
     const filePath = url.split(marker)[1];
     if (!filePath) return;
 
+    const supabaseAdmin = getSupabaseAdmin();
     await supabaseAdmin.storage.from('media').remove([filePath]);
   } catch (e) {
     console.error('[Supabase Storage] Erro ao deletar mídia:', e);
@@ -33,6 +38,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     }
 
     const token = authHeader.replace('Bearer ', '');
+    const supabaseAdmin = getSupabaseAdmin();
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
     if (authError || !user) {

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-utils';
-import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 
 /**
  * POST /api/chat/upload
@@ -11,18 +10,12 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
  *  - Imagens: image/* (máx. 10MB)
  *  - Áudio:   audio/* (máx. 5MB) — para mensagens de voz
  *  - Vídeo:   video/* (máx. 30MB)
- *
- * Rate limit: 20 uploads por minuto por usuário.
  */
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
   if (isAuthError(auth)) return auth;
 
   const { user } = auth;
-
-  // Rate limit: 20 uploads por minuto
-  const rl = await checkRateLimit(`chat:upload:${user.id}`, 20, 60);
-  if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
   try {
     const formData = await request.formData();

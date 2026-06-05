@@ -70,8 +70,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { conversationId, content, attachmentUrl } = body;
 
-    if (!conversationId || !content?.trim()) {
-      return NextResponse.json({ error: 'conversationId e content são obrigatórios.' }, { status: 400 });
+    if (!conversationId || (!content?.trim() && !attachmentUrl)) {
+      return NextResponse.json({ error: 'conversationId e content (ou anexo) são obrigatórios.' }, { status: 400 });
     }
 
     if (content.length > 4000) {

@@ -1,0 +1,35 @@
+name: CD — Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy via SSH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to self-hosted server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # ── Acesse o diretório do projeto no servidor ────────────────────
+            # PREENCHA ABAIXO COM O CAMINHO REAL DO PROJETO NO SEU SERVIDOR:
+            cd /home/jpadmin/literaconnect
+
+            # ── Atualiza o código-fonte a partir do repositório remoto ───────
+            git pull origin main
+
+            # ── Reconstrói as imagens e recria os contêineres afetados ───────
+            # O --build força o rebuild apenas das imagens com Dockerfile (Next.js).
+            # Contêineres de serviços externos (Postgres, Redis, etc.) não são
+            # afetados, garantindo zero downtime generalizado.
+            docker compose up -d --build
+
+            # ── Remove imagens órfãs para liberar espaço em disco ────────────
+            docker image prune -f

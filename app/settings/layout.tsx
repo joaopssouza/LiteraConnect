@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, Shield, Sliders, MonitorPlay, ChevronLeft } from 'lucide-react';
+import { User, Shield, Sliders, MonitorPlay, ChevronLeft, LifeBuoy, ShieldCheck, UserCog } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
@@ -11,9 +11,11 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
   const settingsLinks = [
     { href: '/settings/account', label: 'Conta', icon: User },
-    { href: '/settings/privacy', label: 'Privacidade', icon: Shield },
     { href: '/settings/preferences', label: 'Preferências', icon: Sliders },
     { href: '/settings/security', label: 'Segurança', icon: MonitorPlay },
+    { href: '/settings/ajuda', label: 'Ajuda', icon: LifeBuoy },
+    { href: '/settings/central-privacidade', label: 'Central de Privacidade', icon: ShieldCheck },
+    { href: '/settings/status', label: 'Status da conta', icon: UserCog },
   ];
 
   const isRootSettings = pathname === '/settings';

@@ -12,6 +12,12 @@ create table public.users (
   bio text,
   birth_date date,
   gender text,
+  consent_terms_accepted_at timestamp with time zone,
+  consent_privacy_accepted_at timestamp with time zone,
+  consent_age_declared_at timestamp with time zone,
+  consent_marketing_accepted_at timestamp with time zone,
+  consent_ip text,
+  consent_version text default '1.0',
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -115,14 +121,20 @@ declare
 begin
   user_handle := coalesce(new.raw_user_meta_data->>'handle', split_part(new.email, '@', 1));
   
-  insert into public.users (id, name, handle, avatar_url, birth_date, gender)
+  insert into public.users (id, name, handle, avatar_url, birth_date, gender, consent_terms_accepted_at, consent_privacy_accepted_at, consent_age_declared_at, consent_marketing_accepted_at, consent_ip, consent_version)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
     user_handle,
     coalesce(new.raw_user_meta_data->>'avatar_url', '/api/avatar?seed=' || user_handle || '&size=150'),
     (new.raw_user_meta_data->>'birth_date')::date,
-    new.raw_user_meta_data->>'gender'
+    new.raw_user_meta_data->>'gender',
+    (new.raw_user_meta_data->>'consent_terms_accepted_at')::timestamp with time zone,
+    (new.raw_user_meta_data->>'consent_privacy_accepted_at')::timestamp with time zone,
+    (new.raw_user_meta_data->>'consent_age_declared_at')::timestamp with time zone,
+    (new.raw_user_meta_data->>'consent_marketing_accepted_at')::timestamp with time zone,
+    new.raw_user_meta_data->>'consent_ip',
+    coalesce(new.raw_user_meta_data->>'consent_version', '1.0')
   );
   return new;
 end;

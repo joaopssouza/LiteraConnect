@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { getLocalAvatar } from '@/lib/avatar';
@@ -11,6 +11,7 @@ interface AuthContextType {
   profile: any | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  onlineUserIds: string[];
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   isLoading: true,
   signOut: async () => {},
+  onlineUserIds: [],
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -26,6 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  const globalPresenceRef = useRef<any>(null);
 
   const ensureUserProfile = async (authUser: User) => {
     try {
@@ -95,8 +99,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  useEffect(() => {
+    if (!user) return;
+    
+    // Configura a presença global
+    const syncPresence = () => {
+      if (!globalPresenceRef.current) return;
+      const state = globalPresenceRef.current.presenceState();
+      setOnlineUserIds(Array.from(new Set(Object.values(state).flat().map((p: any) => p.user_id).filter(Boolean))));
+    };
+
+    if (globalPresenceRef.current) {
+      supabase.removeChannel(globalPresenceRef.current);
+    }
+
+    const ch = supabase
+      .channel('online:users', { config: { presence: { key: user.id } } })
+      .on('presence', { event: 'sync' }, syncPresence)
+      .on('presence', { event: 'join' }, syncPresence)
+      .on('presence', { event: 'leave' }, syncPresence)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await ch.track({ user_id: user.id });
+          syncPresence();
+        }
+      });
+
+    globalPresenceRef.current = ch;
+
+    return () => {
+      if (globalPresenceRef.current) {
+        supabase.removeChannel(globalPresenceRef.current);
+        globalPresenceRef.current = null;
+      }
+    };
+  }, [user]);
+
   return (
-    <AuthContext.Provider value={{ user, session, profile, isLoading, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, isLoading, signOut, onlineUserIds }}>
       {children}
     </AuthContext.Provider>
   );

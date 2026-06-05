@@ -75,7 +75,7 @@ AS $$
       WHERE cp.conversation_id = c.id
     ) as participants,
     (
-      SELECT jsonb_build_object('id', u.id, 'name', u.name, 'handle', u.handle, 'avatar_url', u.avatar_url, 'last_seen_at', null)
+      SELECT jsonb_build_object('id', u.id, 'name', u.name, 'handle', u.handle, 'avatar_url', u.avatar_url, 'last_seen_at', u.last_seen_at)
       FROM public.conversation_participants cp
       JOIN public.users u ON u.id = cp.user_id
       WHERE cp.conversation_id = c.id AND cp.user_id != p_user_id

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { BookOpen, Loader2, ArrowLeft } from 'lucide-react';
+import ConsentCheckboxes, { ConsentState } from '@/components/ConsentCheckboxes';
 
 // Ícone SVG do Google (sem dependência externa)
 const GoogleIcon = () => (
@@ -31,7 +32,11 @@ export default function LoginClient() {
   const [mfaCode, setMfaCode] = useState('');
   const [factorId, setFactorId] = useState<string | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [consents, setConsents] = useState<ConsentState>({ terms: false, privacy: false, age: false, marketing: false });
   const router = useRouter();
+  
+  const allConsented = consents.terms && consents.privacy && consents.age;
+  const isSubmitDisabled = loading || (!isLogin && !isForgotPassword && !allConsented);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -42,11 +47,7 @@ export default function LoginClient() {
       if (typeof window !== 'undefined') {
         localStorage.clear();
         sessionStorage.clear();
-        document.cookie.split(";").forEach((c) => {
-          document.cookie = c
-            .replace(/^ +/, "")
-            .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-        });
+        await supabase.auth.signOut();
       }
 
       const { error } = await supabase.auth.signInWithOAuth({
@@ -56,7 +57,7 @@ export default function LoginClient() {
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
-            hd: 'senaimgaluno.com.br',
+            // hd: 'senaimgaluno.com.br', // Temporariamente desativado para testes
           },
         },
       });
@@ -74,9 +75,10 @@ export default function LoginClient() {
     setMessage(null);
 
     try {
-      if (!isForgotPassword && !email.endsWith('@senaimgaluno.com.br')) {
-        throw new Error('Apenas e-mails institucionais (@senaimgaluno.com.br) são permitidos.');
-      }
+      // Temporariamente desativado para testes
+      // if (!isForgotPassword && !email.endsWith('@senaimgaluno.com.br')) {
+      //   throw new Error('Apenas e-mails institucionais (@senaimgaluno.com.br) são permitidos.');
+      // }
 
       if (isForgotPassword) {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -122,6 +124,11 @@ export default function LoginClient() {
               handle: handle.toLowerCase().replace(/[^a-z0-9_]/g, ''),
               birth_date: birthDate,
               gender: gender,
+              consent_terms_accepted_at: consents.terms ? new Date().toISOString() : null,
+              consent_privacy_accepted_at: consents.privacy ? new Date().toISOString() : null,
+              consent_age_declared_at: consents.age ? new Date().toISOString() : null,
+              consent_marketing_accepted_at: consents.marketing ? new Date().toISOString() : null,
+              consent_version: '1.0'
             },
           },
         });
@@ -358,6 +365,10 @@ export default function LoginClient() {
               </div>
             )}
 
+            {!isLogin && !isForgotPassword && (
+              <ConsentCheckboxes value={consents} onChange={setConsents} />
+            )}
+
             {error && (
               <div className="text-red-500 text-xs bg-red-500/10 p-4 rounded-xl border border-red-500/20 font-medium">
                 {error}
@@ -373,7 +384,7 @@ export default function LoginClient() {
             <div className="space-y-3">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isSubmitDisabled}
                 className="flex w-full justify-center items-center gap-2 rounded-xl bg-brand-2 px-4 py-4 text-sm font-black text-white shadow-lg shadow-brand-2/20 hover:opacity-90 focus:outline-none transition-all active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? (

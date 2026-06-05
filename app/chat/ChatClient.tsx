@@ -70,7 +70,7 @@ interface Message {
 }
 
 export default function ChatClient() {
-  const { user } = useAuth();
+  const { user, profile, onlineUserIds } = useAuth();
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [filter, setFilter] = useState<FilterTab>('all');
@@ -84,7 +84,6 @@ export default function ChatClient() {
   const [newMessage, setNewMessage] = useState('');
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null);
-  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [isWindowFocused, setIsWindowFocused] = useState(true);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [searchUsers, setSearchUsers] = useState<any[]>([]);
@@ -218,21 +217,8 @@ export default function ChatClient() {
     }
   }, [selectedId, conversations]);
 
-  /* ─── Global presence ─── */
   useEffect(() => {
     if (!user) return;
-    const sync = () => {
-      if (!globalPresenceRef.current) return;
-      const state = globalPresenceRef.current.presenceState<{ user_id: string }>();
-      setOnlineUserIds(Array.from(new Set(Object.values(state).flat().map(p => p.user_id).filter(Boolean))));
-    };
-    const ch = supabase
-      .channel('online:users', { config: { presence: { key: user.id } } })
-      .on('presence', { event: 'sync' }, sync)
-      .on('presence', { event: 'join' }, sync)   // FIX: recalcular quando alguém entra
-      .on('presence', { event: 'leave' }, sync)  // FIX: recalcular quando alguém sai
-      .subscribe(s => { if (s === 'SUBSCRIBED') { ch.track({ user_id: user.id }); sync(); } });
-    globalPresenceRef.current = ch;
     const ping = async () => {
       try { await fetch('/api/chat/presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id }) }); }
       catch {}
@@ -244,21 +230,12 @@ export default function ChatClient() {
     return () => {
       clearInterval(id);
       document.removeEventListener('visibilitychange', onVis);
-      if (globalPresenceRef.current) { supabase.removeChannel(globalPresenceRef.current); globalPresenceRef.current = null; }
     };
   }, [user]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  /* ─── Polling para parar as dots no receptor ─── */
-  // O Supabase nao garante evento 'sync' quando o sender atualiza track() sem sair do canal.
-  // O setInterval checa a cada 1s se o typing_at expirou e limpa o indicador.
-  useEffect(() => {
-    if (typingUsers.length === 0) return; // nao faz nada se nao ha dots para mostrar
-    const id = setInterval(syncTypingUsers, 1000);
-    return () => clearInterval(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typingUsers.length]); // reage apenas quando a quantidade muda, nao a cada render
+  /* ─── Fim polling desnecessário ─── */
 
 
   /* ─── Modal search: busca global (todos os usuários) ─── */
@@ -345,19 +322,14 @@ export default function ChatClient() {
 
   const syncTypingUsers = () => {
     if (!channelRef.current || !user) return;
-    const state = channelRef.current.presenceState<{ user_id?: string; name?: string; typing?: boolean; typing_at?: number }>();
-    const now = Date.now();
-    // FIX: inclui typing_at para auto-parar no receptor mesmo sem evento 'sync' do Supabase
-    // O Supabase nao dispara 'sync' quando o sender atualiza track() sem sair do canal
+    const state = channelRef.current.presenceState<{ user_id?: string; name?: string; typing?: boolean }>();
     setTypingUsers(
       Object.values(state)
         .flat()
         .filter(p =>
           p?.typing === true &&
           p?.user_id &&
-          p.user_id !== user.id &&
-          // Auto-stop: se typing_at existe e passou mais de 5s, considera parado
-          (!p.typing_at || (now - p.typing_at) < 5000)
+          p.user_id !== user.id
         )
         .map(p => (p.name || 'Usuário').split(' ')[0])
     );
@@ -399,9 +371,6 @@ export default function ChatClient() {
       name: user?.user_metadata?.full_name || user?.email || 'Usuário',
       handle: user?.user_metadata?.handle,
       typing,
-      // FIX: typing_at permite ao receptor calcular elapsed time e parar as dots
-      // independentemente de receber evento 'sync' do Supabase
-      typing_at: typing ? Date.now() : 0,
     });
   };
 

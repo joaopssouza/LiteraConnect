@@ -5,8 +5,8 @@ Bem-vindo à documentação oficial do **LiteraConnect**, uma plataforma social 
 ## Índice de Navegação
 *(No Obsidian, você pode clicar nestes links ou usar `[[Nome do Arquivo]]` para navegar)*
 
-- [[01_Arquitetura_e_Stack]] — Visão geral das tecnologias e infraestrutura Cloud.
-- [[02_Bancos_de_Dados]] — Esquemas do Supabase, coleções do MongoDB e chaves do Redis.
+- [[01_Arquitetura_e_Stack]] — Visão geral das tecnologias e infraestrutura Self-Hosted.
+- [[02_Bancos_de_Dados]] — Esquemas do Supabase local, coleções do MongoDB e chaves do Redis.
 - [[03_Backend_e_APIs]] — Documentação das rotas da API (Next.js App Router).
 - [[04_Roadmap_e_Sprints]] — Planejamento de entregas, visão e tarefas pendentes.
 

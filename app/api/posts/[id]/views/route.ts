@@ -2,16 +2,20 @@ import { NextResponse } from 'next/server';
 import { connectRedis } from '@/lib/redis';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+// Remove global client instantiation to avoid build errors if env vars are missing
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+}
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
 
   try {
+    const supabaseAdmin = getSupabaseAdmin();
     // Lê o valor persistido no banco
     const { data } = await supabaseAdmin
       .from('posts')
