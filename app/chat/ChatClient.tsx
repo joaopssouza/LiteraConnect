@@ -125,6 +125,7 @@ export default function ChatClient() {
       };
       
       fetchActivityUnread();
+      window.addEventListener('activity-read', fetchActivityUnread);
       
       const activityChannel = supabase
         .channel(`chat-activity-unread:${user.id}`)
@@ -134,6 +135,7 @@ export default function ChatClient() {
         .subscribe();
 
       return () => {
+        window.removeEventListener('activity-read', fetchActivityUnread);
         supabase.removeChannel(activityChannel);
       };
     } 
@@ -144,14 +146,34 @@ export default function ChatClient() {
     if (!selectedId) return;
     loadMessages(selectedId);
     subscribeToRealtime(selectedId);
+    
+    // Polling fallback para garantir a chegada de mensagens mesmo se o CDC / Websocket falhar
+    const fallbackPollId = setInterval(() => {
+      if (!selectedId || document.hidden || !user) return;
+      fetch(`/api/chat/messages?userId=${user.id}&conversationId=${selectedId}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(d => {
+          if (d && d.messages) {
+            setMessages(prev => {
+              if (prev.length !== d.messages.length || prev[prev.length - 1]?.id !== d.messages[d.messages.length - 1]?.id) {
+                return d.messages;
+              }
+              return prev;
+            });
+            setOtherLastReadAt(d.other_last_read_at || null);
+          }
+        }).catch(() => {});
+    }, 10000);
+
     // FIX anti-flicker: marcar como lido apenas na troca de conversa, nao quando o foco muda
     markConversationAsRead(selectedId);
     return () => {
+      clearInterval(fallbackPollId);
       if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
       if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
       setTypingUsers([]);
     };
-  }, [selectedId]); // <-- isWindowFocused REMOVIDO: evita reconexão Realtime a cada foco
+  }, [selectedId, user]); // <-- isWindowFocused REMOVIDO: evita reconexão Realtime a cada foco
 
   /* ─── Marca como lido quando janela volta ao foco (effect separado para nao recriar subscription) ─── */
   useEffect(() => {

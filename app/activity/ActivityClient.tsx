@@ -97,6 +97,17 @@ export default function ActivityClient() {
 
       setActivities(incomingActivities);
       previousActivityIdsRef.current = incomingActivities.map((item: ActivityItem) => item.id);
+      
+      // Atualiza o contador total local para o sidebar sumir com a badge
+      fetch('/api/notifications/unread-count')
+        .then(r => r.json())
+        .then(d => {
+          if (d.activity !== undefined) {
+            localStorage.setItem(`last-activity-count-${user.id}`, String(d.activity));
+            window.dispatchEvent(new Event('activity-read'));
+          }
+        })
+        .catch(() => {});
     } catch (error) {
       console.error('Erro ao buscar atividades:', error);
     } finally {
