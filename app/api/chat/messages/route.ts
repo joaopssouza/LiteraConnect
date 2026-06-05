@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-utils';
 import { buildServerCacheKey, invalidateServerCacheByPrefix } from '@/lib/server-cache';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -185,7 +186,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'action inválida.' }, { status: 400 });
     }
 
-    const { data: updated, error: updateErr } = await supabase
+    const { data: updated, error: updateErr } = await supabaseAdmin
       .from('messages')
       .update(update)
       .eq('id', messageId)
