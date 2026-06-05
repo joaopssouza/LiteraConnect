@@ -283,7 +283,7 @@ services:
       FLY_ALLOC_ID: fly123
       FLY_APP_NAME: realtime
       APP_NAME: realtime
-      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE}
+      SECRET_KEY_BASE: "KrVxFzry97YoLDW32nqbUFTZb1sm4VBPrCduC1roqULghckEOc7kP+c37oar3tUfDaF3TvLbGi3nCtCZeCLxQ2wgHqeKNAIC165OVmnPr4M="
       ERL_AFLAGS: -proto_dist inet_tcp
       ENABLE_TAILSCALE: "false"
       DNS_NODES: "''"
