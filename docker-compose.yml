@@ -279,7 +279,7 @@ services:
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
       DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtimesecret}
       API_JWT_SECRET: "KrVxFzry97YoLDW32nqbUFTZb1sm4VBPrCduC1roqULghckEOc7kP+c37oar3tUfaSb4pdXSE3sfksCVzQbDTQ=="
-      METRICS_JWT_SECRET: ${JWT_SECRET}
+      METRICS_JWT_SECRET: "KrVxFzry97YoLDW32nqbUFTZb1sm4VBPrCduC1roqULghckEOc7kP+c37oar3tUfaSb4pdXSE3sfksCVzQbDTQ=="
       FLY_ALLOC_ID: fly123
       FLY_APP_NAME: realtime
       APP_NAME: realtime
