@@ -11,7 +11,7 @@
 
   **Uma plataforma social moderna para leitores e autores, inspirada no Substack, focada em performance extrema e arquitetura 100% self-hosted.**
 
-  [Arquitetura e Stack](file:///d:/PROJETOS/senai_projeto_leitura/docs/01_Arquitetura_e_Stack.md) • [Modelagem de Dados](file:///d:/PROJETOS/senai_projeto_leitura/docs/02_Bancos_de_Dados.md) • [Manual de APIs](file:///d:/PROJETOS/senai_projeto_leitura/docs/03_Backend_e_APIs.md) • [Roadmap](file:///d:/PROJETOS/senai_projeto_leitura/docs/04_Roadmap_e_Sprints.md)
+  [Arquitetura e Stack](file:///c:/PROJETOS/LiteraConnect/docs/01_Arquitetura_e_Stack.md) • [Modelagem de Dados](file:///c:/PROJETOS/LiteraConnect/docs/02_Bancos_de_Dados.md) • [Manual de APIs](file:///c:/PROJETOS/LiteraConnect/docs/03_Backend_e_APIs.md) • [Roadmap](file:///c:/PROJETOS/LiteraConnect/docs/04_Roadmap_e_Sprints.md) • [Deploy & CI/CD](file:///c:/PROJETOS/LiteraConnect/docs/05_Deploy_e_CI_CD.md)
 </div>
 
 ---
