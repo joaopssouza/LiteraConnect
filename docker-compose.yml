@@ -84,13 +84,23 @@ services:
     environment:
       KONG_NGINX_HTTP_LARGE_CLIENT_HEADER_BUFFERS: 4 64k
       KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DECLARATIVE_CONFIG: /tmp/kong.generated.yml
       KONG_DNS_ORDER: LAST,A,CNAME
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        sed -e "s|__SUPABASE_ANON_KEY__|$$SUPABASE_ANON_KEY|g" \
+          -e "s|__SUPABASE_SERVICE_KEY__|$$SUPABASE_SERVICE_KEY|g" \
+            /var/lib/kong/kong.yml.template > /tmp/kong.generated.yml
+        exec /docker-entrypoint.sh kong docker-start
     volumes:
-      - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
+      - ./supabase/kong.yml:/var/lib/kong/kong.yml.template:ro
     depends_on:
       supabase_db:
         condition: service_started
@@ -277,7 +287,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB:-postgres}
       DB_AFTER_CONNECT_QUERY: 'SET search_path TO _realtime'
-      # DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtimesecret}
+      DB_ENC_KEY: ${REALTIME_DB_ENC_KEY:-supabaserealtimesecret}
       API_JWT_SECRET: "KrVxFzry97YoLDW32nqbUFTZb1sm4VBPrCduC1roqULghckEOc7kP+c37oar3tUfaSb4pdXSE3sfksCVzQbDTQ=="
       METRICS_JWT_SECRET: "KrVxFzry97YoLDW32nqbUFTZb1sm4VBPrCduC1roqULghckEOc7kP+c37oar3tUfaSb4pdXSE3sfksCVzQbDTQ=="
       FLY_ALLOC_ID: fly123

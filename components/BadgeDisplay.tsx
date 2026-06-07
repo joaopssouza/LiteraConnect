@@ -29,7 +29,7 @@ interface BadgeDisplayProps {
 export default function BadgeDisplay({ userId, compact = false, className }: BadgeDisplayProps) {
   const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hoveredBadge, setHoveredBadge] = useState<string | null>(null);
+  const [openBadge, setOpenBadge] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -40,7 +40,15 @@ export default function BadgeDisplay({ userId, compact = false, className }: Bad
       .finally(() => setLoading(false));
   }, [userId]);
 
-  if (loading || badges.length === 0) return null;
+  if (loading) return null;
+
+  if (badges.length === 0) {
+    return (
+      <p className={cn('text-xs text-[var(--text-main)]/45 italic', className)}>
+        Sem conquistas desbloqueadas ainda.
+      </p>
+    );
+  }
 
   const displayBadges = compact ? badges.slice(0, 3) : badges;
   const remainingCount = compact ? Math.max(0, badges.length - 3) : 0;
@@ -49,14 +57,19 @@ export default function BadgeDisplay({ userId, compact = false, className }: Bad
     return (
       <div className={cn('flex items-center gap-1', className)}>
         {displayBadges.map((badge) => (
-          <div
+          <button
             key={badge.badge_type}
-            className="relative group"
-            onMouseEnter={() => setHoveredBadge(badge.badge_type)}
-            onMouseLeave={() => setHoveredBadge(null)}
+            type="button"
+            className="relative group outline-none"
+            onMouseEnter={() => setOpenBadge(badge.badge_type)}
+            onMouseLeave={() => setOpenBadge((current) => (current === badge.badge_type ? null : current))}
+            onClick={() => setOpenBadge((current) => (current === badge.badge_type ? null : badge.badge_type))}
+            onBlur={() => setOpenBadge(null)}
+            aria-pressed={openBadge === badge.badge_type}
+            aria-label={`${badge.name}: ${badge.description}`}
           >
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-sm border-2 transition-transform group-hover:scale-110 cursor-default shadow-sm"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-sm border-2 transition-transform group-hover:scale-110 cursor-pointer shadow-sm"
               style={{ borderColor: `${badge.color}40`, backgroundColor: `${badge.color}15` }}
               title={badge.name}
             >
@@ -64,7 +77,7 @@ export default function BadgeDisplay({ userId, compact = false, className }: Bad
             </div>
 
             {/* Tooltip */}
-            {hoveredBadge === badge.badge_type && (
+            {openBadge === badge.badge_type && (
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none">
                 <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl px-3 py-2 shadow-xl w-max max-w-[180px] text-center">
                   <p className="text-xs font-bold text-[var(--text-main)]">{badge.name}</p>
@@ -74,7 +87,7 @@ export default function BadgeDisplay({ userId, compact = false, className }: Bad
                 </div>
               </div>
             )}
-          </div>
+          </button>
         ))}
 
         {remainingCount > 0 && (

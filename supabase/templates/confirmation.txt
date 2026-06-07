@@ -1,0 +1,18 @@
+LiteraConnect
+
+Confirme seu endereço de e-mail
+
+Olá,
+
+Obrigado por se juntar à maior comunidade literária! Para concluir o seu cadastro e garantir a segurança da sua conta, por favor, confirme seu endereço de e-mail acessando o link abaixo:
+
+{{ .ConfirmationURL }}
+
+Se você preferir inserir um código manualmente no aplicativo, utilize o código abaixo:
+
+Seu código de verificação: {{ .Token }}
+
+Se você não solicitou este e-mail, pode ignorá-lo com segurança. O seu e-mail não será ativado.
+
+Um abraço,
+Equipe LiteraConnect

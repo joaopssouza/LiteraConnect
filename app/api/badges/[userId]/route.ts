@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { requireAuth, isAuthError } from '@/lib/auth-utils';
 import clientPromise from '@/lib/mongodb';
 import { connectRedis } from '@/lib/redis';
 
@@ -67,9 +66,6 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const auth = await requireAuth(request);
-  if (isAuthError(auth)) return auth;
-
   const { userId } = await params;
 
   const cacheKey = `badges:user:${userId}`;

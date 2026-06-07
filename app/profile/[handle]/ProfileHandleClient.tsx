@@ -55,6 +55,7 @@ export default function ProfileHandleClient() {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [editGoalTarget, setEditGoalTarget] = useState(12);
   const [isSavingGoal, setIsSavingGoal] = useState(false);
+  const [badgesExpanded, setBadgesExpanded] = useState(false);
 
   const [isAddBookModalOpen, setIsAddBookModalOpen] = useState(false);
   const [bookSearchQuery, setBookSearchQuery] = useState('');
@@ -581,28 +582,48 @@ export default function ProfileHandleClient() {
 
           {/* Gamificação: Conquistas (Badges) */}
           <div className="mt-6 pt-4 border-t border-[var(--border)]/40">
-            <h3 className="text-xs font-bold text-brand-2 uppercase tracking-widest mb-3">Conquistas</h3>
-            <BadgeDisplay userId={profile.id} compact={true} />
+            <button
+              type="button"
+              onClick={() => setBadgesExpanded((current) => !current)}
+              className="flex w-full items-center justify-between gap-3 mb-3 text-left rounded-lg px-1 py-1 -mx-1 hover:bg-[var(--border)]/5 transition-colors"
+              aria-expanded={badgesExpanded}
+            >
+              <h3 className="text-xs font-bold text-brand-2 uppercase tracking-widest">Conquistas</h3>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-main)]/45 hover:text-brand-2 transition-colors">
+                {badgesExpanded ? 'Resumir' : 'Ver todas'}
+              </span>
+            </button>
+            <BadgeDisplay userId={profile.id} compact={!badgesExpanded} />
           </div>
         </div>
       </div>
 
-      {isOwnProfile && (
-        <div className="border-b border-[var(--border)] bg-[var(--bg-main)] px-4">
-          <div className="flex gap-6">
-            <button
-              onClick={() => setActiveTab('posts')}
-              className={`py-4 text-sm font-bold border-b-2 transition-all ${
-                activeTab === 'posts'
-                  ? 'border-brand-2 text-[var(--text-main)]'
-                  : 'border-transparent text-[var(--text-main)]/40 hover:text-[var(--text-main)]'
-              }`}
-            >
-              Publicados
-            </button>
+      <div className="border-b border-[var(--border)] bg-[var(--bg-main)] px-4">
+        <div className="flex gap-6 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('posts')}
+            className={`py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
+              activeTab === 'posts'
+                ? 'border-brand-2 text-[var(--text-main)]'
+                : 'border-transparent text-[var(--text-main)]/40 hover:text-[var(--text-main)]'
+            }`}
+          >
+            Publicados
+          </button>
+          <button
+            onClick={() => setActiveTab('bookshelf')}
+            className={`py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
+              activeTab === 'bookshelf'
+                ? 'border-brand-2 text-[var(--text-main)]'
+                : 'border-transparent text-[var(--text-main)]/40 hover:text-[var(--text-main)]'
+            }`}
+          >
+            Estante
+          </button>
+          {isOwnProfile && (
             <button
               onClick={() => setActiveTab('saved')}
-              className={`py-4 text-sm font-bold border-b-2 transition-all ${
+              className={`py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
                 activeTab === 'saved'
                   ? 'border-brand-2 text-[var(--text-main)]'
                   : 'border-transparent text-[var(--text-main)]/40 hover:text-[var(--text-main)]'
@@ -610,19 +631,9 @@ export default function ProfileHandleClient() {
             >
               Salvos
             </button>
-            <button
-              onClick={() => setActiveTab('bookshelf')}
-              className={`py-4 text-sm font-bold border-b-2 transition-all ${
-                activeTab === 'bookshelf'
-                  ? 'border-brand-2 text-[var(--text-main)]'
-                  : 'border-transparent text-[var(--text-main)]/40 hover:text-[var(--text-main)]'
-              }`}
-            >
-              Estante
-            </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {profile.is_private && !isOwnProfile && !isFollowing ? (
         <div className="p-16 flex flex-col items-center justify-center text-center bg-[var(--surface)] mt-4 rounded-xl mx-6 border border-[var(--border)]">

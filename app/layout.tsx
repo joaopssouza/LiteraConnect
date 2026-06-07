@@ -7,6 +7,7 @@ import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar';
 import { Toaster } from 'sonner';
 import LGPDConsentBanner from '@/components/LGPDConsentBanner';
 import Footer from '@/components/Footer';
+import Script from 'next/script';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://literaconnect.vercel.app';
 const APP_NAME = 'LiteraConnect';
@@ -64,9 +65,19 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className="text-brand-1 font-sans antialiased min-h-screen" suppressHydrationWarning>
+        <Script id="supabase-runtime-config" strategy="beforeInteractive">
+          {`window.__LITERA_SUPABASE__ = ${JSON.stringify({
+            supabaseUrl,
+            supabaseAnonKey,
+          })};`}
+        </Script>
+
         {/* Skip to content — acessibilidade WCAG 2.1 */}
         <a href="#main-content" className="skip-link">
           Pular para o conteúdo
