@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, MessageSquare, Bell, User, LogOut, LogIn, Settings, PlaySquare, Radio } from 'lucide-react';
+import { Home, Search, MessageSquare, Bell, User, LogOut, LogIn, Settings, PlaySquare, Radio, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 export function Navigation() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const [isExpanded, setIsExpanded] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [activityUnreadCount, setActivityUnreadCount] = useState(0);
   const unreadChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -158,13 +159,25 @@ export function Navigation() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r border-[var(--border)] bg-[var(--surface)] h-screen fixed left-0 top-0 p-4 z-50">
-        <div className="flex items-center gap-3 mb-8 px-2">
-          <div className="w-8 h-8 bg-brand-2 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+      <aside 
+        onMouseLeave={() => setIsExpanded(false)}
+        className={cn(
+          "hidden md:flex flex-col border-r border-[var(--border)] bg-[var(--surface)] h-screen fixed left-0 top-0 z-50 overflow-x-hidden p-3",
+          isExpanded ? "w-64 transition-[width] duration-300 ease-in-out" : "w-[72px]"
+        )}
+      >
+        <div className="flex items-center gap-3 mb-8 px-2 h-8">
+          <div className="w-8 h-8 bg-brand-2 rounded-lg flex items-center justify-center text-white font-bold text-xl shrink-0">
             L
           </div>
-          <span className="text-xl font-bold text-[var(--text-main)]">LiteraConnect</span>
+          <span className={cn(
+            "text-xl font-bold text-[var(--text-main)] whitespace-nowrap overflow-hidden",
+            isExpanded ? "opacity-100 w-auto transition-all duration-300" : "opacity-0 w-0"
+          )}>
+            LiteraConnect
+          </span>
         </div>
+
         <nav className="flex flex-col gap-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href === '/chat' && pathname === '/activity');
@@ -176,13 +189,14 @@ export function Navigation() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-3 rounded-xl transition-colors',
+                  'flex items-center rounded-xl transition-colors w-full px-3 h-12 gap-3',
                   isActive
                     ? 'bg-[var(--border)] text-[var(--text-main)] font-semibold'
                     : 'text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 hover:text-[var(--text-main)]'
                 )}
+                title={!isExpanded ? item.label : undefined}
               >
-                <span className="relative inline-flex">
+                <span className="relative inline-flex shrink-0">
                   <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 2} />
                   {showBadge && (
                     <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-2 text-white text-[10px] font-bold inline-flex items-center justify-center border-2 border-[var(--surface)]">
@@ -190,38 +204,81 @@ export function Navigation() {
                     </span>
                   )}
                 </span>
-                <span className="text-lg">{item.label}</span>
+
+                <span className={cn(
+                  "text-lg whitespace-nowrap overflow-hidden",
+                  isExpanded ? "opacity-100 w-auto transition-all duration-300" : "opacity-0 w-0"
+                )}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </nav>
 
         <div className="mt-auto flex flex-col gap-4">
+          <button
+            onMouseEnter={() => setIsExpanded(true)}
+            className="flex items-center rounded-xl text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 hover:text-[var(--text-main)] transition-colors w-full text-left px-3 h-12 gap-3"
+            title={!isExpanded ? "Menu" : undefined}
+          >
+            <span className="relative inline-flex shrink-0">
+              <Menu className="w-6 h-6" strokeWidth={2} />
+            </span>
+            <span className={cn(
+              "text-lg whitespace-nowrap overflow-hidden",
+              isExpanded ? "opacity-100 w-auto transition-all duration-300" : "opacity-0 w-0"
+            )}>
+              Menu
+            </span>
+          </button>
+
           {user ? (
             <>
               <Link
                 href="/settings"
-                className="flex items-center gap-3 px-3 py-3 rounded-xl text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 hover:text-[var(--text-main)] transition-colors"
-                title="Configurações"
+                className="flex items-center rounded-xl text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 hover:text-[var(--text-main)] transition-colors w-full px-3 h-12 gap-3"
+                title={!isExpanded ? "Configurações" : undefined}
               >
-                <Settings className="w-6 h-6" strokeWidth={2} />
-                <span className="text-lg">Configurações</span>
+                <span className="relative inline-flex shrink-0">
+                  <Settings className="w-6 h-6" strokeWidth={2} />
+                </span>
+                <span className={cn(
+                  "text-lg whitespace-nowrap overflow-hidden",
+                  isExpanded ? "opacity-100 w-auto transition-all duration-300" : "opacity-0 w-0"
+                )}>
+                  Configurações
+                </span>
               </Link>
               <button
                 onClick={signOut}
-                className="flex items-center gap-3 px-3 py-3 rounded-xl text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 text-red-500 hover:text-red-600 transition-colors"
+                className="flex items-center rounded-xl text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 text-red-500 hover:text-red-600 transition-colors w-full text-left px-3 h-12 gap-3"
+                title={!isExpanded ? "Sair" : undefined}
               >
-                <LogOut className="w-6 h-6" strokeWidth={2} />
-                <span className="text-lg">Sair</span>
+                <span className="relative inline-flex shrink-0">
+                  <LogOut className="w-6 h-6" strokeWidth={2} />
+                </span>
+                <span className={cn(
+                  "text-lg whitespace-nowrap overflow-hidden",
+                  isExpanded ? "opacity-100 w-auto transition-all duration-300" : "opacity-0 w-0"
+                )}>
+                  Sair
+                </span>
               </button>
             </>
           ) : (
             <Link
               href="/login"
-              className="flex items-center justify-center gap-2 bg-brand-2 text-white rounded-full py-3 font-bold hover:opacity-90 transition-all shadow-lg"
+              className="flex items-center bg-brand-2 text-white rounded-xl font-bold hover:opacity-90 transition-all shadow-lg justify-center w-full px-3 h-12 gap-3"
+              title={!isExpanded ? "Entrar" : undefined}
             >
-              <LogIn className="w-5 h-5" />
-              <span>Entrar</span>
+              <LogIn className="w-5 h-5 shrink-0" />
+              <span className={cn(
+                "whitespace-nowrap overflow-hidden",
+                isExpanded ? "opacity-100 w-auto transition-all duration-300" : "opacity-0 w-0"
+              )}>
+                Entrar
+              </span>
             </Link>
           )}
         </div>

@@ -9,6 +9,8 @@ import { UserSuggestions } from '@/components/UserSuggestions';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { useSearch, SearchFilter } from '@/hooks/useSearch';
 import { cn } from '@/lib/utils';
+import gsap from 'gsap';
+import { useGSAP } from '@gsap/react';
 
 function AutoPlayVideo({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -46,6 +48,65 @@ function AutoPlayVideo({ src }: { src: string }) {
   );
 }
 
+function PostCardSkeleton() {
+  return (
+    <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)] animate-pulse">
+      <div className="flex gap-3">
+        <div className="w-12 h-12 rounded-full bg-[var(--border)]/60 flex-shrink-0" />
+        <div className="flex-1 space-y-3 py-1">
+          <div className="flex items-center gap-2">
+            <div className="h-4 bg-[var(--border)]/60 rounded w-1/4" />
+            <div className="h-3 bg-[var(--border)]/60 rounded w-1/6" />
+            <div className="h-3 bg-[var(--border)]/60 rounded w-1/12" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-3.5 bg-[var(--border)]/60 rounded w-full" />
+            <div className="h-3.5 bg-[var(--border)]/60 rounded w-5/6" />
+          </div>
+          <div className="h-44 bg-[var(--border)]/40 rounded-2xl w-full" />
+          <div className="flex items-center justify-between pt-2 max-w-md">
+            <div className="h-8 bg-[var(--border)]/60 rounded-full w-12" />
+            <div className="h-8 bg-[var(--border)]/60 rounded-full w-12" />
+            <div className="h-8 bg-[var(--border)]/60 rounded-full w-12" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PostListSkeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--surface)]">
+      {Array.from({ length: count }).map((_, i) => (
+        <PostCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+function TrendingCardSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 shrink-0 w-[220px] animate-pulse">
+      <div className="relative aspect-[2/3] rounded-2xl bg-[var(--border)]/40 border border-[var(--border)]" />
+      <div className="px-1 space-y-1.5">
+        <div className="h-4 bg-[var(--border)]/60 rounded w-3/4" />
+        <div className="h-3 bg-[var(--border)]/60 rounded w-1/2" />
+      </div>
+    </div>
+  );
+}
+
+function TrendingSkeleton() {
+  return (
+    <div className="flex gap-5 overflow-x-auto pb-4 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <TrendingCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
 const PERIOD_OPTIONS: { label: string; value: SearchFilter['period'] }[] = [
   { label: 'Qualquer época', value: 'all' },
   { label: 'Esta semana', value: '7d' },
@@ -62,6 +123,8 @@ export default function ExploreClient() {
   const { query, setQuery, filters, setFilters, results, trending, isSearching, error } = useSearch();
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [isLoadingRecs, setIsLoadingRecs] = useState(false);
+  const trendingContainerRef = useRef<HTMLDivElement>(null);
+  const recsContainerRef = useRef<HTMLDivElement>(null);
 
   const hasQuery = query.trim().length > 0;
 
@@ -75,6 +138,26 @@ export default function ExploreClient() {
       .catch(() => {})
       .finally(() => setIsLoadingRecs(false));
   }, [hasQuery]);
+
+  useGSAP(() => {
+    if (trending.length > 0 && trendingContainerRef.current) {
+      gsap.fromTo(
+        trendingContainerRef.current.children,
+        { opacity: 0, y: 30, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.6, stagger: 0.1, ease: 'power2.out' }
+      );
+    }
+  }, [trending]);
+
+  useGSAP(() => {
+    if (recommendations.length > 0 && recsContainerRef.current) {
+      gsap.fromTo(
+        recsContainerRef.current.children,
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5, stagger: 0.08, ease: 'power1.out' }
+      );
+    }
+  }, [recommendations]);
 
   return (
     <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)]">
@@ -151,7 +234,9 @@ export default function ExploreClient() {
                 )}
               </h2>
             </div>
-            {results.length === 0 && !isSearching ? (
+            {isSearching ? (
+              <PostListSkeleton count={2} />
+            ) : results.length === 0 ? (
               <div className="text-center py-20 bg-[var(--surface)] rounded-3xl border border-[var(--border)] border-dashed">
                 <LayoutGrid className="w-12 h-12 mx-auto mb-4 text-[var(--text-main)]/10" />
                 <p className="text-[var(--text-main)]/60 font-bold">Nenhum resultado para &ldquo;{query}&rdquo;</p>
@@ -173,7 +258,7 @@ export default function ExploreClient() {
                     bookTitle={post.book_title || undefined}
                     bookCover={post.book_cover_url || post.video_url || undefined}
                     media={post.media}
-                    timeAgo={new Date(post.created_at).toLocaleDateString('pt-BR')}
+                    timeAgo={new Date(post.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                     likes={post.likes_count ?? 0}
                     comments={post.comments_count ?? 0}
                     reposts={0}
@@ -198,11 +283,9 @@ export default function ExploreClient() {
               </span>
             </h2>
             {isLoadingRecs ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-brand-2" />
-              </div>
+              <PostListSkeleton count={3} />
             ) : recommendations.length > 0 ? (
-              <div className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--surface)]">
+              <div ref={recsContainerRef} className="divide-y divide-[var(--border)] border border-[var(--border)] rounded-2xl overflow-hidden bg-[var(--surface)]">
                 {recommendations.map((post: any) => (
                   <PostCard
                     key={post.id}
@@ -217,7 +300,7 @@ export default function ExploreClient() {
                     bookTitle={post.book_title || undefined}
                     bookCover={post.book_cover_url || undefined}
                     media={post.media}
-                    timeAgo={new Date(post.created_at).toLocaleDateString('pt-BR')}
+                    timeAgo={new Date(post.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                     likes={post.likes_count ?? 0}
                     comments={post.comments_count ?? 0}
                     reposts={0}
@@ -245,11 +328,9 @@ export default function ExploreClient() {
             Em alta no momento
           </h2>
           {trending.length === 0 ? (
-            <div className="p-10 text-center bg-[var(--surface)] rounded-3xl border border-[var(--border)] text-[var(--text-main)]/20 font-bold italic">
-              Buscando tendências...
-            </div>
+            <TrendingSkeleton />
           ) : (
-            <div className="flex gap-5 overflow-x-auto pb-4 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div ref={trendingContainerRef} className="flex gap-5 overflow-x-auto pb-4 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {trending.map((post) => (
                 <Link
                   key={post.id}

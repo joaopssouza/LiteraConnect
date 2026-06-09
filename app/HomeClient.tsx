@@ -2,13 +2,34 @@
 
 import { useRef, useState } from 'react';
 import { PostCard } from '@/components/PostCard';
-import { PenSquare, Book, Image as ImageIcon, X, Loader2 } from 'lucide-react';
+import { PenSquare, Book, Image as ImageIcon, X, Loader2, Globe, Users, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import { uploadMedia } from '@/lib/supabase-storage';
 import { UserSuggestions } from '@/components/UserSuggestions';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { useFeed } from '@/hooks/useFeed';
+
+const SkeletonPostCard = () => (
+  <div className="p-4 border-b border-[var(--border)] animate-pulse flex gap-3">
+    <div className="w-10 h-10 rounded-full bg-[var(--border)]/20 shrink-0"></div>
+    <div className="flex-1 space-y-3">
+      <div className="flex gap-2">
+        <div className="h-4 bg-[var(--border)]/20 rounded w-24"></div>
+        <div className="h-4 bg-[var(--border)]/20 rounded w-16"></div>
+      </div>
+      <div className="h-3 bg-[var(--border)]/20 rounded w-full"></div>
+      <div className="h-3 bg-[var(--border)]/20 rounded w-5/6"></div>
+      <div className="h-48 bg-[var(--border)]/20 rounded w-full mt-2"></div>
+    </div>
+  </div>
+);
+
+const SkeletonPosts = () => (
+  <div>
+    {[1, 2, 3].map(i => <SkeletonPostCard key={i} />)}
+  </div>
+);
 
 export default function HomeClient() {
   const { user } = useAuth();
@@ -19,6 +40,7 @@ export default function HomeClient() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
+  const [visibility, setVisibility] = useState<'public' | 'followers' | 'private'>('public');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,6 +83,7 @@ export default function HomeClient() {
           content: content.trim(),
           book_title: bookTitle.trim() || null,
           book_cover_url: uploadedImageUrl,
+          visibility,
         }),
       });
 
@@ -71,6 +94,7 @@ export default function HomeClient() {
 
       setContent('');
       setBookTitle('');
+      setVisibility('public');
       removeImage();
       loadInitial();
     } catch (error: any) {
@@ -84,9 +108,6 @@ export default function HomeClient() {
     <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)]">
       <header className="sticky top-0 z-10 bg-[var(--bg-main)]/80 backdrop-blur-md border-b border-[var(--border)] p-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-[var(--text-main)]">Feed de Resenhas</h1>
-        <Link href="/post" className="md:hidden bg-brand-2 text-white p-2 rounded-full shadow-lg">
-          <PenSquare className="w-5 h-5" />
-        </Link>
       </header>
 
       {/* Create Post */}
@@ -144,13 +165,46 @@ export default function HomeClient() {
                   <ImageIcon className="w-5 h-5" />
                 </button>
               </div>
-              <button
-                type="submit"
-                disabled={isPosting || !content.trim()}
-                className="bg-brand-2 text-white px-6 py-2 rounded-full font-bold hover:opacity-90 transition-all disabled:opacity-40 shadow-md active:scale-95"
-              >
-                {isPosting ? 'Postando...' : 'Postar'}
-              </button>
+
+              <div className="flex gap-3 items-center">
+                <div className="hidden sm:flex rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
+                  <button
+                    type="button"
+                    onClick={() => setVisibility('public')}
+                    className={`inline-flex items-center px-3 py-1.5 text-xs font-bold transition-all ${
+                      visibility === 'public' ? 'bg-brand-2 text-white' : 'text-[var(--text-main)]/60 hover:bg-[var(--border)]/50'
+                    }`}
+                  >
+                    <Globe size={14} className="mr-1.5" /> Público
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVisibility('followers')}
+                    className={`inline-flex items-center px-3 py-1.5 text-xs font-bold transition-all border-l border-[var(--border)] ${
+                      visibility === 'followers' ? 'bg-brand-2 text-white' : 'text-[var(--text-main)]/60 hover:bg-[var(--border)]/50'
+                    }`}
+                  >
+                    <Users size={14} className="mr-1.5" /> Seguidores
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVisibility('private')}
+                    className={`inline-flex items-center px-3 py-1.5 text-xs font-bold transition-all border-l border-[var(--border)] ${
+                      visibility === 'private' ? 'bg-brand-2 text-white' : 'text-[var(--text-main)]/60 hover:bg-[var(--border)]/50'
+                    }`}
+                  >
+                    <Lock size={14} className="mr-1.5" /> Privado
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isPosting || !content.trim()}
+                  className="bg-brand-2 text-white px-6 py-2 rounded-full font-bold hover:opacity-90 transition-all disabled:opacity-40 shadow-md active:scale-95"
+                >
+                  {isPosting ? 'Postando...' : 'Postar'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -171,10 +225,7 @@ export default function HomeClient() {
       {/* Lista de Posts */}
       <div className="divide-y divide-[var(--border)]">
         {loading ? (
-          <div className="p-12 flex flex-col items-center justify-center gap-4 text-[var(--text-main)]/40">
-            <Loader2 className="w-8 h-8 animate-spin text-brand-2" />
-            <span className="font-medium">Sincronizando feed...</span>
-          </div>
+          <SkeletonPosts />
         ) : error ? (
           <div className="p-12 text-center text-red-500 font-medium">{error}</div>
         ) : posts.length > 0 ? (
@@ -193,7 +244,7 @@ export default function HomeClient() {
                 bookTitle={post.book_title ?? undefined}
                 bookCover={post.book_cover_url ?? post.video_url ?? undefined}
                 media={post.media}
-                timeAgo={new Date(post.created_at).toLocaleDateString('pt-BR')}
+                timeAgo={new Date(post.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                 likes={post.likes_count ?? 0}
                 comments={post.comments_count ?? 0}
                 recent_comments={post.recent_comments}

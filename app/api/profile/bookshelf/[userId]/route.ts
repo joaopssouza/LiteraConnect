@@ -50,7 +50,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
           updated_at: item.updated_at,
           title: bookData.title,
           authors: bookData.authors,
-          thumbnail: bookData.thumbnail
+          thumbnail: bookData.thumbnail,
+          description: bookData.description,
+          categories: bookData.categories,
+          pageCount: bookData.pageCount,
+          publishedDate: bookData.publishedDate,
+          isbn: bookData.isbn
         });
       }
     }

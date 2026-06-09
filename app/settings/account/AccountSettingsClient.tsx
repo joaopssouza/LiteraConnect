@@ -39,20 +39,54 @@ export default function AccountSettingsClient() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    const cleanName = profileName.trim();
+    const cleanHandle = profileHandle.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const cleanBio = profileBio.trim();
+
+    if (!cleanName) {
+      setMessage({ type: 'error', text: 'Nome é obrigatório.' });
+      return;
+    }
+
+    if (cleanName.length > 40) {
+      setMessage({ type: 'error', text: 'O nome excede 40 caracteres.' });
+      return;
+    }
+
+    if (!cleanHandle || cleanHandle.length < 2) {
+      setMessage({ type: 'error', text: 'O @handle precisa ter ao menos 2 caracteres.' });
+      return;
+    }
+
+    if (cleanHandle.length > 10) {
+      setMessage({ type: 'error', text: 'O @handle excede 10 caracteres.' });
+      return;
+    }
+
+    if (cleanBio.length > 350) {
+      setMessage({ type: 'error', text: 'A bio excede 350 caracteres.' });
+      return;
+    }
+
     setProfileLoading(true);
     setMessage(null);
 
     const { error } = await supabase.from('users').update({
-      name: profileName,
-      handle: profileHandle,
-      bio: profileBio,
+      name: cleanName,
+      handle: cleanHandle,
+      bio: cleanBio || null,
       birth_date: profileBirthDate || null,
       gender: profileGender || null
     }).eq('id', user.id);
 
     setProfileLoading(false);
     if (error) {
-      setMessage({ type: 'error', text: 'Erro ao atualizar perfil: ' + error.message });
+      if (error.message.includes('users_handle_key') || error.code === '23505') {
+        setMessage({ type: 'error', text: 'Esse @handle já está em uso.' });
+      } else {
+        setMessage({ type: 'error', text: 'Erro ao atualizar perfil: ' + error.message });
+      }
     } else {
       setMessage({ type: 'success', text: 'Perfil atualizado com sucesso.' });
     }
@@ -152,22 +186,30 @@ export default function AccountSettingsClient() {
           <p className="text-sm text-[var(--text-main)]/60 mb-4">Essas informações são públicas na sua página de perfil.</p>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-[var(--text-main)]/80 mb-1 block">Nome de Exibição</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-sm font-medium text-[var(--text-main)]/80">Nome de Exibição</label>
+                <span className="text-[10px] text-[var(--text-main)]/40">{profileName.length}/40</span>
+              </div>
               <input
                 type="text"
                 value={profileName}
                 onChange={(e) => setProfileName(e.target.value)}
                 className="w-full bg-[var(--bg-main)] border border-[var(--border)] text-[var(--text-main)] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-2 transition-all"
+                maxLength={40}
                 required
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[var(--text-main)]/80 mb-1 block">Nome de Usuário (@handle)</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-sm font-medium text-[var(--text-main)]/80">Nome de Usuário (@handle)</label>
+                <span className="text-[10px] text-[var(--text-main)]/40">{profileHandle.length}/10</span>
+              </div>
               <input
                 type="text"
                 value={profileHandle}
                 onChange={(e) => setProfileHandle(e.target.value)}
                 className="w-full bg-[var(--bg-main)] border border-[var(--border)] text-[var(--text-main)] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-2 transition-all"
+                maxLength={10}
                 required
               />
             </div>
@@ -196,11 +238,15 @@ export default function AccountSettingsClient() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-[var(--text-main)]/80 mb-1 block">Bio</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-sm font-medium text-[var(--text-main)]/80">Bio</label>
+                <span className="text-[10px] text-[var(--text-main)]/40">{profileBio.length}/350</span>
+              </div>
               <textarea
                 value={profileBio}
                 onChange={(e) => setProfileBio(e.target.value)}
                 className="w-full bg-[var(--bg-main)] border border-[var(--border)] text-[var(--text-main)] rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-2 transition-all min-h-[100px] resize-y"
+                maxLength={350}
               />
             </div>
           </div>

@@ -35,9 +35,18 @@ export async function GET(request: Request) {
       const { data: blocks } = await supabase.from('user_blocks').select('blocked_id').eq('blocker_id', userId);
       const blockedIds = blocks?.map((b: any) => b.blocked_id) || [];
 
+      // Pega listagem de seguidos para a visibilidade 'followers'
+      const { data: follows } = await supabase.from('follows').select('following_id').eq('follower_id', userId);
+      const followingIds = follows?.map((f: any) => f.following_id) || [];
+
       // Pega preferências do usuário
       const { data: prefs } = await supabase.from('user_preferences').select('favorite_categories').eq('user_id', userId).single();
       const favoriteCategories = prefs?.favorite_categories || [];
+
+      let visibilityOr = `visibility.eq.public,and(visibility.eq.private,user_id.eq.${userId}),and(visibility.eq.followers,user_id.eq.${userId}),and(visibility.eq.unlisted,user_id.eq.${userId})`;
+      if (followingIds.length > 0) {
+        visibilityOr += `,and(visibility.eq.followers,user_id.in.(${followingIds.join(',')}))`;
+      }
 
       let query = supabase
         .from('posts')
@@ -56,8 +65,7 @@ export async function GET(request: Request) {
         .limit(limit + 1)
         .eq('status', 'published')
         .or(`scheduled_at.is.null,scheduled_at.lte.${now}`)
-        // Usuário autenticado pode ver seus próprios posts não listados
-        .or(`visibility.eq.public,and(visibility.eq.unlisted,user_id.eq.${userId})`);
+        .or(visibilityOr);
 
       if (blockedIds.length > 0) {
         query = query.not('user_id', 'in', `(${blockedIds.join(',')})`);

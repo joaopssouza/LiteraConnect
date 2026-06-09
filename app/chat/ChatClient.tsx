@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
-  Search, Plus, Send, CheckCheck, X, UserPlus, Loader2,
+  Search, Plus, Send, CheckCheck, Check, X, UserPlus, Loader2,
   Pencil, Trash2, Smile, Settings, Phone, Video, Info,
   ImageIcon, Paperclip, PlusCircle, Lock, Bell
 } from 'lucide-react';
@@ -43,6 +43,31 @@ function AvatarImg({
 }
 
 const EMOJI_OPTIONS = ['❤️', '😂', '👍', '😢', '😮', '🔥'];
+
+const SkeletonChatList = () => (
+  <div className="flex flex-col w-full">
+    {[1, 2, 3, 4, 5].map(i => (
+      <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-l-2 border-transparent">
+        <div className="w-[46px] h-[46px] rounded-full bg-[var(--border)]/20 animate-pulse shrink-0"></div>
+        <div className="flex-1 space-y-2">
+          <div className="h-3 bg-[var(--border)]/20 rounded w-1/3 animate-pulse"></div>
+          <div className="h-2.5 bg-[var(--border)]/20 rounded w-2/3 animate-pulse"></div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+const SkeletonMessages = () => (
+  <div className="flex flex-col gap-6 py-6 px-4 w-full">
+    {[1, 2, 3, 4].map(i => (
+      <div key={i} className={`flex ${i % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
+        <div className={`w-2/3 h-12 rounded-[18px] bg-[var(--border)]/10 animate-pulse ${i % 2 === 0 ? 'rounded-br-[4px]' : 'rounded-bl-[4px]'}`}></div>
+      </div>
+    ))}
+  </div>
+);
+
 type FilterTab = 'all' | 'unread' | 'groups';
 
 interface Conversation {
@@ -83,6 +108,8 @@ export default function ChatClient() {
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [activeChannelPresence, setActiveChannelPresence] = useState<Record<string, any>>({});
+  const [tick, setTick] = useState(0);
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null);
   const [isWindowFocused, setIsWindowFocused] = useState(true);
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -105,6 +132,7 @@ export default function ChatClient() {
   const selectedByUserRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isTypingRef = useRef(false); // evita track() redundante quando estado nao muda
+  const isChannelSubscribedRef = useRef(false);
   const fileInputMediaRef = useRef<HTMLInputElement | null>(null);
   const fileInputDocRef = useRef<HTMLInputElement | null>(null);
 
@@ -255,6 +283,12 @@ export default function ChatClient() {
     };
   }, [user]);
 
+  // Força re-render a cada 10s para expirar status e atualizar tempos ("visto há 1m", etc)
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t: number) => t + 1), 10000);
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   /* ─── Fim polling desnecessário ─── */
@@ -308,7 +342,12 @@ export default function ChatClient() {
   const markConversationAsRead = async (conversationId: string) => {
     if (!user) return;
     try {
-      await fetch('/api/chat/conversations', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId }) });
+      // Usa o endpoint de messages com action mark_read para emitir broadcast read_receipt em tempo real
+      await fetch('/api/chat/messages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_read', conversationId })
+      });
       setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, unread_count: 0 } : c));
     } catch {}
   };
@@ -342,83 +381,112 @@ export default function ChatClient() {
     } catch (e) { console.error(e); }
   };
 
-  const syncTypingUsers = () => {
-    if (!channelRef.current || !user) return;
-    const state = channelRef.current.presenceState<{ user_id?: string; name?: string; typing?: boolean }>();
+  const syncActiveChannelPresence = (ch: any) => {
+    if (!ch || !user) return;
+    const state = ch.presenceState() as Record<string, any>;
+    setActiveChannelPresence(state);
+    
     setTypingUsers(
       Object.values(state)
         .flat()
-        .filter(p =>
+        .filter((p: any) =>
           p?.typing === true &&
           p?.user_id &&
           p.user_id !== user.id
         )
-        .map(p => (p.name || 'Usuário').split(' ')[0])
+        .map((p: any) => (p.name || 'Usuário').split(' ')[0])
     );
   };
 
   const subscribeToRealtime = (conversationId: string) => {
-    if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
+    if (channelRef.current) { 
+      supabase.removeChannel(channelRef.current); 
+      channelRef.current = null; 
+      isChannelSubscribedRef.current = false;
+    }
     const ch = supabase
       .channel(`messages:${conversationId}`, { config: { presence: { key: user?.id || 'anon' } } })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, ({ new: msg }) => {
-        const m = msg as Message;
+      // Escuta os broadcasts da API em vez do postgres_changes para ignorar problemas de subqueries RLS
+      .on('broadcast', { event: 'new_message' }, ({ payload }) => {
+        const m = payload.message as Message;
+        if (!m) return;
         setMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m]);
         setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, last_message: { id: m.id, content: m.content, user_id: m.user_id, created_at: m.created_at }, unread_count: 0 } : c));
         if (m.user_id !== user?.id && isWindowFocused && !document.hidden) markConversationAsRead(conversationId);
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, ({ new: msg }) => {
-        setMessages(prev => prev.map(m => m.id === (msg as Message).id ? (msg as Message) : m));
+      .on('broadcast', { event: 'update_message' }, ({ payload }) => {
+        const m = payload.message as Message;
+        if (!m) return;
+        setMessages(prev => prev.map(x => x.id === m.id ? m : x));
       })
-      .on('presence', { event: 'sync' }, syncTypingUsers)
-      .on('presence', { event: 'join' }, syncTypingUsers)
-      .on('presence', { event: 'leave' }, syncTypingUsers)
+      // Recebe confirmacao de leitura do outro usuario => atualiza ticks azuis imediatamente
+      .on('broadcast', { event: 'read_receipt' }, (msg: any) => {
+        const payload = msg?.payload;
+        if (!payload || payload.user_id === user?.id) return;
+        const readAt: string = payload.read_at;
+        setOtherLastReadAt(readAt);
+        setConversations((prev: Conversation[]) => prev.map((c: Conversation) =>
+          c.id === conversationId
+            ? { ...c, other_last_read_at: readAt }
+            : c
+        ));
+      })
+      .on('presence', { event: 'sync' }, () => syncActiveChannelPresence(ch))
+      .on('presence', { event: 'join' }, () => syncActiveChannelPresence(ch))
+      .on('presence', { event: 'leave' }, () => syncActiveChannelPresence(ch))
       .subscribe(s => {
         if (s === 'SUBSCRIBED') {
+          isChannelSubscribedRef.current = true;
+          // Forca re-track com estado atual de typing
           ch.track({ user_id: user?.id, name: user?.user_metadata?.full_name || user?.email || 'Usuário', handle: user?.user_metadata?.handle, typing: false });
-          syncTypingUsers();
+          syncActiveChannelPresence(ch);
+        } else if (s === 'CHANNEL_ERROR' || s === 'CLOSED' || s === 'TIMED_OUT') {
+          isChannelSubscribedRef.current = false;
         }
       });
     channelRef.current = ch;
-    // Reseta flag de typing ao entrar em nova conversa
+    // Reseta flags de estado ao entrar em nova conversa
     isTypingRef.current = false;
   }; // fim subscribeToRealtime
 
-  const sendTypingState = (typing: boolean) => {
+  const sendTypingState = async (typing: boolean) => {
     // Evita chamar track() se o estado nao mudou (reduz noise no canal de presenca)
     if (isTypingRef.current === typing) return;
     isTypingRef.current = typing;
-    channelRef.current?.track({
-      user_id: user?.id,
-      name: user?.user_metadata?.full_name || user?.email || 'Usuário',
-      handle: user?.user_metadata?.handle,
-      typing,
-    });
+    
+    // So tenta enviar se estiver inscrito no canal ativo
+    if (!isChannelSubscribedRef.current || !channelRef.current) return;
+    
+    try {
+      await channelRef.current.track({
+        user_id: user?.id,
+        name: user?.user_metadata?.full_name || user?.email || 'Usuário',
+        handle: user?.user_metadata?.handle,
+        typing,
+      });
+    } catch {}
   };
 
   useEffect(() => {
-    if (!channelRef.current || !user) return;
-
-    // FIX: limpa o timeout SEMPRE, seja com texto ou sem
+    // Limpa o timeout SEMPRE que newMessage muda, seja com texto ou sem
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     }
 
     if (newMessage.trim().length > 0) {
-      // Usuário está digitando: sinaliza e agenda o auto-off
-      // 8s de inatividade: tempo maior para quem escreve mensagens longas e pausa para pensar
+      // Usuário está digitando: sinaliza e agenda auto-off de 5s
       sendTypingState(true);
       typingTimeoutRef.current = setTimeout(() => {
         sendTypingState(false);
         typingTimeoutRef.current = null;
-      }, 8000);
+      }, 5000);
     } else {
-      // Campo vazio: para imediatamente sem esperar timeout
+      // Campo vazio: para imediatamente
       sendTypingState(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newMessage]); // user omitido: nao queremos recriar o efeito por mudanca de user
+  }, [newMessage]);
 
   const sendMessage = async (overrideContent?: string, attachmentUrl?: string) => {
     const finalContent = overrideContent !== undefined ? overrideContent : newMessage;
@@ -535,10 +603,19 @@ export default function ChatClient() {
     if (d.toDateString() === yesterday.toDateString()) return 'Ontem';
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
   };
+  const getIsOnline = (chatOther: any) => {
+    if (!chatOther) return false;
+    if (onlineUserIds.includes(chatOther.id)) return true;
+    if (chatOther.last_seen_at && (Date.now() - new Date(chatOther.last_seen_at).getTime() < 120000)) return true;
+    return false;
+  };
+
   const formatLastSeen = (lastSeenAt?: string | null, isOnline?: boolean) => {
-    if (isOnline) return 'Online agora';
+    const diff = lastSeenAt ? Date.now() - new Date(lastSeenAt).getTime() : Infinity;
+    const isOnlineFallback = isOnline || diff < 120000;
+    
+    if (isOnlineFallback) return 'Online agora';
     if (!lastSeenAt) return 'Offline';
-    const diff = Date.now() - new Date(lastSeenAt).getTime();
     const m = Math.max(1, Math.floor(diff / 60000));
     if (m < 60) return `Visto há ${m}m`;
     const h = Math.floor(m / 60);
@@ -569,7 +646,27 @@ export default function ChatClient() {
     </div>
   );
 
-  const otherIsOnline = !!activeConversation?.other?.id && onlineUserIds.includes(activeConversation.other.id);
+  const otherIsOnline = useMemo(() => {
+    if (!activeConversation?.other) return false;
+    const otherId = activeConversation.other.id;
+    
+    // 1. Canal de presença ativo da conversa
+    const isPresentInActiveChannel = Object.values(activeChannelPresence)
+      .flat()
+      .some((p: any) => p?.user_id === otherId);
+    if (isPresentInActiveChannel) return true;
+    
+    // 2. Lista de presença global
+    if (onlineUserIds.includes(otherId)) return true;
+    
+    // 3. Fallback de data de última visualização (limite de 1 min)
+    if (activeConversation.other_last_seen_at && (Date.now() - new Date(activeConversation.other_last_seen_at).getTime() < 60000)) {
+      return true;
+    }
+    
+    return false;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversation, activeChannelPresence, onlineUserIds, tick]);
 
   return (
     <div
@@ -662,9 +759,7 @@ export default function ChatClient() {
           )}
 
           {loadingConvos ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="w-5 h-5 animate-spin text-brand-2/40" />
-            </div>
+            <SkeletonChatList />
           ) : filteredConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 gap-2">
               <MessageSquareIcon className="w-8 h-8 text-[var(--text-main)]/15" />
@@ -675,7 +770,7 @@ export default function ChatClient() {
           ) : (
             filteredConversations.map(chat => {
               const isActive = selectedId === chat.id;
-              const otherOnline = onlineUserIds.includes(chat.other?.id || '');
+              const otherOnline = getIsOnline(chat.other);
               return (
                 <button
                   key={chat.id}
@@ -770,7 +865,7 @@ export default function ChatClient() {
               </div>
 
               {loadingMessages ? (
-                <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-brand-2/40" /></div>
+                <SkeletonMessages />
               ) : (
                 groupedMessages.map(({ date, msgs }) => (
                   <div key={date}>
@@ -855,7 +950,17 @@ export default function ChatClient() {
                                   <div className={cn('flex items-center justify-end gap-1 mt-1', isMe ? 'text-white/50' : 'text-[var(--text-main)]/30')}>
                                     <span className="text-[9px] font-medium">{formatTime(msg.created_at)}</span>
                                     {msg.edited_at && !isDeleted && <span className="text-[9px]">· editado</span>}
-                                    {isMe && <CheckCheck className={cn('w-3 h-3 flex-shrink-0', readByOther ? 'text-sky-300' : '')} />}
+                                    {/* Read receipts: 3 estados estilo WhatsApp */}
+                                    {isMe && !isDeleted && (
+                                      msg.id.startsWith('local_')
+                                        // ✓ Tick único cinza: enviando (ainda não confirmado pelo servidor)
+                                        ? <Check className="w-3 h-3 flex-shrink-0 opacity-60" />
+                                        : readByOther
+                                          // ✓✓ Ticks azuis: lido pelo outro usuário
+                                          ? <CheckCheck className="w-3 h-3 flex-shrink-0 text-sky-300" />
+                                          // ✓✓ Ticks brancos/cinzas: entregue mas não lido
+                                          : <CheckCheck className="w-3 h-3 flex-shrink-0" />
+                                    )}
                                   </div>
                                 </>
                               )}

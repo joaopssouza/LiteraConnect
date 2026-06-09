@@ -6,11 +6,80 @@ import { supabase } from '@/lib/supabase';
 import { PostCard } from '@/components/PostCard';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
-import { Camera, X, Plus, Trash2, Edit3, BookOpen, Search, Check, Trophy, Lock } from 'lucide-react';
+import { Camera, X, Plus, Trash2, Edit3, BookOpen, Search, Check, Trophy, Lock, Info } from 'lucide-react';
 import { uploadMedia } from '@/lib/supabase-storage';
 import Link from 'next/link';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import BadgeDisplay from '@/components/BadgeDisplay';
+import { toast } from 'sonner';
+
+const SkeletonBookCard = () => (
+  <div className="relative group rounded-lg overflow-hidden animate-pulse">
+    <div className="relative aspect-[2/3] w-full bg-[var(--border)]/20 rounded-lg overflow-hidden shadow-sm"></div>
+    <div className="mt-2 px-0.5 space-y-2">
+      <div className="h-3 bg-[var(--border)]/20 rounded w-3/4"></div>
+      <div className="h-2 bg-[var(--border)]/20 rounded w-1/2"></div>
+    </div>
+  </div>
+);
+
+const SkeletonBookshelf = () => (
+  <div className="p-6">
+    <div className="space-y-8">
+      {[1, 2].map(i => (
+        <div key={i}>
+          <div className="h-6 bg-[var(--border)]/20 rounded w-48 mb-4"></div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map(j => <SkeletonBookCard key={`${i}-${j}`} />)}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const SkeletonPostCard = () => (
+  <div className="p-4 border-b border-[var(--border)] animate-pulse flex gap-3">
+    <div className="w-10 h-10 rounded-full bg-[var(--border)]/20 shrink-0"></div>
+    <div className="flex-1 space-y-3">
+      <div className="flex gap-2">
+        <div className="h-4 bg-[var(--border)]/20 rounded w-24"></div>
+        <div className="h-4 bg-[var(--border)]/20 rounded w-16"></div>
+      </div>
+      <div className="h-3 bg-[var(--border)]/20 rounded w-full"></div>
+      <div className="h-3 bg-[var(--border)]/20 rounded w-5/6"></div>
+      <div className="h-48 bg-[var(--border)]/20 rounded w-full mt-2"></div>
+    </div>
+  </div>
+);
+
+const SkeletonPosts = () => (
+  <div>
+    {[1, 2, 3].map(i => <SkeletonPostCard key={i} />)}
+  </div>
+);
+
+const SkeletonProfile = () => (
+  <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)] animate-pulse">
+    <div className="sticky top-0 z-10 bg-[var(--bg-main)]/80 border-b border-[var(--border)] p-4 space-y-2">
+      <div className="h-5 bg-[var(--border)]/20 rounded w-32"></div>
+      <div className="h-3 bg-[var(--border)]/20 rounded w-20"></div>
+    </div>
+    <div className="p-6 border-b border-[var(--border)] bg-[var(--surface)]">
+      <div className="flex justify-between items-start">
+        <div className="w-24 h-24 rounded-full bg-[var(--border)]/20 shrink-0"></div>
+        <div className="w-24 h-8 rounded-full bg-[var(--border)]/20"></div>
+      </div>
+      <div className="mt-4 space-y-3">
+        <div className="h-6 bg-[var(--border)]/20 rounded w-48"></div>
+        <div className="h-4 bg-[var(--border)]/20 rounded w-32"></div>
+        <div className="h-4 bg-[var(--border)]/20 rounded w-full mt-4"></div>
+        <div className="h-4 bg-[var(--border)]/20 rounded w-5/6"></div>
+      </div>
+    </div>
+    <SkeletonPosts />
+  </div>
+);
 
 type UserCard = {
   id: string;
@@ -62,6 +131,7 @@ export default function ProfileHandleClient() {
   const [isSearchingBooks, setIsSearchingBooks] = useState(false);
   const [bookSearchResults, setBookSearchResults] = useState<any[]>([]);
   const [bookToRemove, setBookToRemove] = useState<string | null>(null);
+  const [selectedBookDetails, setSelectedBookDetails] = useState<any>(null);
 
   useEffect(() => {
     if (handle) {
@@ -200,13 +270,15 @@ export default function ProfileHandleClient() {
         setIsAddBookModalOpen(false);
         setBookSearchQuery('');
         setBookSearchResults([]);
+        toast.success('Estante atualizada com sucesso!');
         await fetchBookshelf();
         await fetchGoal();
       } else {
-        alert('Erro ao adicionar livro.');
+        toast.error('Erro ao adicionar livro.');
       }
     } catch (e) {
       console.error(e);
+      toast.error('Ocorreu um erro ao conectar ao servidor.');
     }
   };
 
@@ -416,8 +488,23 @@ export default function ProfileHandleClient() {
       return;
     }
 
-    if (!cleanHandle || cleanHandle.length < 3) {
-      alert('O @handle precisa ter ao menos 3 caracteres.');
+    if (cleanName.length > 40) {
+      alert('O nome excede 40 caracteres.');
+      return;
+    }
+
+    if (!cleanHandle || cleanHandle.length < 2) {
+      alert('O @handle precisa ter ao menos 2 caracteres.');
+      return;
+    }
+
+    if (cleanHandle.length > 10) {
+      alert('O @handle excede 10 caracteres.');
+      return;
+    }
+
+    if (cleanBio.length > 350) {
+      alert('A bio excede 350 caracteres.');
       return;
     }
 
@@ -488,7 +575,7 @@ export default function ProfileHandleClient() {
   };
 
   if (loading) {
-    return <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)] p-8 text-center text-[var(--text-main)]/60">Carregando...</div>;
+    return <SkeletonProfile />;
   }
 
   if (!profile) {
@@ -647,7 +734,7 @@ export default function ProfileHandleClient() {
         <div className="divide-y divide-[var(--border)]">
         {activeTab === 'bookshelf' ? (
           isLoadingBookshelf ? (
-            <div className="p-12 text-center text-[var(--text-main)]/40 font-medium italic">Carregando estante...</div>
+            <SkeletonBookshelf />
           ) : bookshelf ? (
             <div className="p-6">
               
@@ -711,54 +798,65 @@ export default function ProfileHandleClient() {
                       <h3 className="text-lg font-serif font-bold text-[var(--text-main)] mb-4 border-b border-[var(--border)] pb-2">{statusLabel}</h3>
                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                         {books.map((book: any) => (
-                          <div key={book.id} className="relative group rounded-lg overflow-hidden">
+                          <div key={book.id} className="relative group flex flex-col gap-1">
+                            <h4 className="text-xs font-bold text-[var(--text-main)] truncate text-center w-full px-1" title={book.title}>
+                              {book.title}
+                            </h4>
                             <div className="relative aspect-[2/3] w-full bg-[var(--border)]/20 rounded-lg overflow-hidden shadow-sm">
                               {book.thumbnail ? (
                                 <Image src={book.thumbnail} alt={book.title} fill className="object-cover" unoptimized />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center p-2 text-center text-xs">
+                                <div className="w-full h-full flex items-center justify-center p-2 text-center text-[10px]">
                                   {book.title}
                                 </div>
                               )}
                               
                               {/* Overlay de Ações no Hover */}
-                              {isOwnProfile && (
-                                <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-center">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setBookToRemove(book.id); }}
-                                    className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors active:scale-90"
-                                    title="Remover da estante"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <div className="flex flex-col gap-1 w-full mt-1.5">
-                                    {book.status !== 'reading' && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); updateBookStatus(book.id, 'reading'); }}
-                                        className="text-[9px] bg-brand-2 hover:bg-brand-2/95 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
-                                      >
-                                        Lendo
-                                      </button>
-                                    )}
-                                    {book.status !== 'want_to_read' && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); updateBookStatus(book.id, 'want_to_read'); }}
-                                        className="text-[9px] bg-zinc-600 hover:bg-zinc-700 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
-                                      >
-                                        Quero Ler
-                                      </button>
-                                    )}
-                                    {book.status !== 'read' && (
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); updateBookStatus(book.id, 'read'); }}
-                                        className="text-[9px] bg-green-600 hover:bg-green-700 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
-                                      >
-                                        Lido
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
+                              <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-center">
+                                <button
+                                  onClick={(e: React.MouseEvent) => { e.stopPropagation(); setSelectedBookDetails(book); }}
+                                  className="px-3 py-1.5 bg-zinc-800/80 hover:bg-zinc-700 text-white text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 active:scale-95 border border-zinc-600 shadow-lg"
+                                >
+                                  <Info className="w-3.5 h-3.5" /> Ver detalhes
+                                </button>
+                                {isOwnProfile && (
+                                  <>
+                                    <button
+                                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); setBookToRemove(book.id); }}
+                                      className="p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors active:scale-95 absolute top-2 right-2"
+                                      title="Remover da estante"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <div className="flex flex-col gap-1 w-full mt-1.5">
+                                      {book.status !== 'reading' && (
+                                        <button
+                                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); updateBookStatus(book.id, 'reading'); }}
+                                          className="text-[9px] bg-brand-2 hover:bg-brand-2/95 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
+                                        >
+                                          Lendo
+                                        </button>
+                                      )}
+                                      {book.status !== 'want_to_read' && (
+                                        <button
+                                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); updateBookStatus(book.id, 'want_to_read'); }}
+                                          className="text-[9px] bg-zinc-600 hover:bg-zinc-700 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
+                                        >
+                                          Quero Ler
+                                        </button>
+                                      )}
+                                      {book.status !== 'read' && (
+                                        <button
+                                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); updateBookStatus(book.id, 'read'); }}
+                                          className="text-[9px] bg-green-600 hover:bg-green-700 text-white py-1 px-1 rounded font-bold transition-all active:scale-95"
+                                        >
+                                          Lido
+                                        </button>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             </div>
                             <div className="mt-2 px-0.5">
                               <p className="text-xs font-bold text-[var(--text-main)] line-clamp-1">{book.title}</p>
@@ -779,7 +877,7 @@ export default function ProfileHandleClient() {
             <div className="p-12 text-center text-[var(--text-main)]/40 font-medium italic">Estante indisponível.</div>
           )
         ) : isShowingSaved && isLoadingSavedPosts ? (
-          <div className="p-12 text-center text-[var(--text-main)]/40 font-medium italic">Carregando posts salvos...</div>
+          <SkeletonPosts />
         ) : visiblePosts.length > 0 ? (
           visiblePosts.map((post) => (
             <PostCard 
@@ -795,7 +893,7 @@ export default function ProfileHandleClient() {
               bookTitle={post.book_title}
               bookCover={post.book_cover_url ?? post.video_url}
               media={post.media}
-              timeAgo={new Date(post.created_at).toLocaleDateString('pt-BR')}
+              timeAgo={new Date(post.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
               likes={post.likes?.[0]?.count ?? 0}
               comments={post.comments?.[0]?.count ?? 0}
               recent_comments={post.recent_comments}
@@ -971,6 +1069,91 @@ export default function ProfileHandleClient() {
           </div>
         )}
 
+        {/* Modal de Detalhes do Livro */}
+        {selectedBookDetails && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl bg-[var(--surface)] rounded-3xl shadow-2xl border border-[var(--border)] max-h-[85vh] flex flex-col overflow-hidden">
+              <div className="p-6 border-b border-[var(--border)] flex items-center justify-between sticky top-0 bg-[var(--surface)]/95 backdrop-blur-md z-10">
+                <h3 className="font-serif font-bold text-[var(--text-main)] text-xl flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-brand-2" /> Sobre o Livro
+                </h3>
+                <button onClick={() => setSelectedBookDetails(null)} className="p-2 rounded-full hover:bg-[var(--border)]/50 transition-colors">
+                  <X className="w-5 h-5 text-[var(--text-main)]" />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6 md:p-8">
+                <div className="flex flex-col md:flex-row gap-8">
+                  <div className="shrink-0 w-40 mx-auto md:mx-0">
+                    <div className="relative aspect-[2/3] w-full rounded-lg overflow-hidden shadow-xl border border-[var(--border)]">
+                      {selectedBookDetails.thumbnail ? (
+                        <Image src={selectedBookDetails.thumbnail} alt={selectedBookDetails.title} fill className="object-cover" unoptimized />
+                      ) : (
+                        <div className="w-full h-full bg-[var(--border)]/20 flex items-center justify-center text-center p-4 text-sm font-bold">Sem capa</div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 space-y-4 text-center md:text-left">
+                    <div>
+                      <h2 className="text-2xl font-serif font-bold text-[var(--text-main)] leading-tight">{selectedBookDetails.title}</h2>
+                      <p className="text-[var(--text-main)]/60 text-sm mt-1">Por <span className="font-medium text-[var(--text-main)]">{selectedBookDetails.authors?.join(', ') || 'Autor desconhecido'}</span></p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                      {selectedBookDetails.categories?.map((cat: string) => (
+                        <span key={cat} className="px-3 py-1 bg-brand-2/10 text-brand-2 text-[10px] font-bold uppercase tracking-wider rounded-full">
+                          {cat}
+                        </span>
+                      ))}
+                      {selectedBookDetails.pageCount && (
+                        <span className="px-3 py-1 bg-[var(--border)]/20 text-[var(--text-main)]/70 text-[10px] font-bold uppercase tracking-wider rounded-full flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" /> {selectedBookDetails.pageCount} págs
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="pt-4 border-t border-[var(--border)]/50">
+                      <h4 className="text-sm font-bold text-[var(--text-main)] mb-2">Sinopse</h4>
+                      {selectedBookDetails.description ? (
+                        <p className="text-sm text-[var(--text-main)]/70 leading-relaxed text-justify">
+                          {selectedBookDetails.description}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-[var(--text-main)]/40 italic">Nenhuma sinopse disponível para este livro no catálogo.</p>
+                      )}
+                    </div>
+
+                    <div className="pt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs text-[var(--text-main)]/50">
+                      {selectedBookDetails.publishedDate && (
+                        <div><strong className="text-[var(--text-main)]/70">Publicação:</strong> {selectedBookDetails.publishedDate}</div>
+                      )}
+                      {selectedBookDetails.isbn && (
+                        <div><strong className="text-[var(--text-main)]/70">ISBN:</strong> {selectedBookDetails.isbn}</div>
+                      )}
+                    </div>
+
+                    {currentUser && !isOwnProfile && (
+                      <div className="pt-4 border-t border-[var(--border)]/50 flex justify-center md:justify-start">
+                        <button
+                          onClick={async () => {
+                            await handleAddBookToBookshelf(selectedBookDetails.id || selectedBookDetails._id, 'want_to_read');
+                            setSelectedBookDetails(null);
+                          }}
+                          className="flex items-center gap-2 bg-brand-2 text-white px-5 py-2.5 rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-md"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Quero ler</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-[var(--surface)] rounded-3xl shadow-2xl border border-[var(--border)] overflow-hidden">
@@ -983,32 +1166,41 @@ export default function ProfileHandleClient() {
 
             <div className="p-6 space-y-5">
               <div>
-                <label className="text-xs font-bold text-brand-2 uppercase tracking-widest ml-1">Nome</label>
+                <div className="flex justify-between items-center ml-1">
+                  <label className="text-xs font-bold text-brand-2 uppercase tracking-widest">Nome</label>
+                  <span className="text-[10px] text-[var(--text-main)]/40">{editName.length}/40</span>
+                </div>
                 <input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   className="w-full mt-1.5 bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30 transition-all"
-                  maxLength={60}
+                  maxLength={40}
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-brand-2 uppercase tracking-widest ml-1">@handle</label>
+                <div className="flex justify-between items-center ml-1">
+                  <label className="text-xs font-bold text-brand-2 uppercase tracking-widest">@handle</label>
+                  <span className="text-[10px] text-[var(--text-main)]/40">{editHandle.length}/10</span>
+                </div>
                 <input
                   value={editHandle}
                   onChange={(e) => setEditHandle(e.target.value)}
                   className="w-full mt-1.5 bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30 transition-all"
-                  maxLength={30}
+                  maxLength={10}
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-brand-2 uppercase tracking-widest ml-1">Bio</label>
+                <div className="flex justify-between items-center ml-1">
+                  <label className="text-xs font-bold text-brand-2 uppercase tracking-widest">Bio</label>
+                  <span className="text-[10px] text-[var(--text-main)]/40">{editBio.length}/350</span>
+                </div>
                 <textarea
                   value={editBio}
                   onChange={(e) => setEditBio(e.target.value)}
                   className="w-full mt-1.5 bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30 min-h-28 resize-none transition-all"
-                  maxLength={220}
+                  maxLength={350}
                 />
               </div>
             </div>

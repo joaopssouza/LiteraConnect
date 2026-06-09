@@ -229,3 +229,36 @@ alter table public.user_blocks enable row level security;
 create policy "Users can view blocks they created" on public.user_blocks for select using (auth.uid() = blocker_id);
 create policy "Users can block others" on public.user_blocks for insert with check (auth.uid() = blocker_id);
 create policy "Users can unblock others" on public.user_blocks for delete using (auth.uid() = blocker_id);
+-- 13. Tabela de Posts Ocultos (Hidden Posts)
+create table if not exists public.hidden_posts (
+  user_id uuid references public.users(id) on delete cascade not null,
+  post_id uuid references public.posts(id) on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  primary key (user_id, post_id)
+);
+
+alter table public.hidden_posts enable row level security;
+drop policy if exists "Users can view their hidden posts" on public.hidden_posts;
+drop policy if exists "Users can hide posts" on public.hidden_posts;
+drop policy if exists "Users can unhide posts" on public.hidden_posts;
+create policy "Users can view their hidden posts" on public.hidden_posts for select using (auth.uid() = user_id);
+create policy "Users can hide posts" on public.hidden_posts for insert with check (auth.uid() = user_id);
+create policy "Users can unhide posts" on public.hidden_posts for delete using (auth.uid() = user_id);
+
+-- 14. Tabela de Posts Denunciados (Reported Posts)
+create table if not exists public.reported_posts (
+  id uuid default gen_random_uuid() primary key,
+  reporter_id uuid references public.users(id) on delete cascade not null,
+  post_id uuid references public.posts(id) on delete cascade not null,
+  reason text,
+  status text default 'pending',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique(reporter_id, post_id)
+);
+
+alter table public.reported_posts enable row level security;
+drop policy if exists "Users can view their own reports" on public.reported_posts;
+drop policy if exists "Users can report posts" on public.reported_posts;
+create policy "Users can view their own reports" on public.reported_posts for select using (auth.uid() = reporter_id);
+create policy "Users can report posts" on public.reported_posts for insert with check (auth.uid() = reporter_id);
+

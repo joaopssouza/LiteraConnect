@@ -103,7 +103,7 @@ export default function ReelsClient() {
   }
 
   return (
-    <div className="fixed top-0 left-0 right-0 bottom-[64px] md:bottom-0 md:left-64 bg-black overflow-hidden flex">
+    <div className="fixed top-0 left-0 right-0 bottom-[64px] md:bottom-0 md:left-[72px] bg-black overflow-hidden flex">
       {/* Offset bottom-[83px] no mobile para garantir visibilidade da barra de progresso */}
       <div className={cn(
         "flex-1 flex justify-center transition-all duration-300 ease-in-out",

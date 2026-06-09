@@ -78,18 +78,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })};`}
         </Script>
 
-        {/* Skip to content — acessibilidade WCAG 2.1 */}
-        <a href="#main-content" className="skip-link">
-          Pular para o conteúdo
-        </a>
-
         <ThemeProvider>
           <AuthProvider>
             <div className="flex flex-col md:flex-row min-h-screen">
               <Navigation />
               <main
                 id="main-content"
-                className="flex-1 md:ml-64 pb-20 md:pb-0"
+                className="flex-1 md:ml-[72px] pb-20 md:pb-0"
                 tabIndex={-1}
                 aria-label="Conteúdo principal"
               >

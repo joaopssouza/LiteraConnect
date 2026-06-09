@@ -19,6 +19,9 @@ export default function CentralPrivacidadePage() {
   const [hiddenPostsCount, setHiddenPostsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [hiddenPosts, setHiddenPosts] = useState<any[]>([]);
+  const [isHiddenModalOpen, setIsHiddenModalOpen] = useState(false);
+  const [loadingHidden, setLoadingHidden] = useState(false);
 
   useEffect(() => {
     fetchPrivacyData();
@@ -72,6 +75,33 @@ export default function CentralPrivacidadePage() {
     } catch (error) {
       console.error(error);
       toast.error('Erro ao desbloquear usuário.');
+    }
+  };
+
+  const handleOpenHiddenPosts = async () => {
+    setIsHiddenModalOpen(true);
+    setLoadingHidden(true);
+    try {
+      const res = await fetch('/api/settings/privacy/hidden-posts');
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setHiddenPosts(data.hiddenPosts || []);
+    } catch (e) {
+      toast.error('Erro ao carregar posts ocultos');
+    } finally {
+      setLoadingHidden(false);
+    }
+  };
+
+  const handleUnhidePost = async (postId: string) => {
+    try {
+      const res = await fetch(`/api/posts/${postId}/hide`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      setHiddenPosts(prev => prev.filter(p => p.id !== postId));
+      setHiddenPostsCount(prev => Math.max(0, prev - 1));
+      toast.success('Post reexibido com sucesso');
+    } catch (e) {
+      toast.error('Erro ao reexibir post');
     }
   };
 
@@ -170,10 +200,12 @@ export default function CentralPrivacidadePage() {
           <div className="space-y-4">
              <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold text-[var(--text-main)]">Posts Ocultos</h3>
-              <span className="text-[10px] bg-brand-2/10 text-brand-2 px-2 py-0.5 rounded-full font-bold uppercase">Em breve</span>
             </div>
             <p className="text-sm text-[var(--text-secondary)]">Você ocultou <strong>{hiddenPostsCount}</strong> posts do seu feed.</p>
-            <button disabled className="text-sm px-4 py-2 bg-black/5 dark:bg-white/5 border border-[var(--border-main)] text-[var(--text-secondary)] rounded-xl cursor-not-allowed w-full font-medium">
+            <button 
+              onClick={handleOpenHiddenPosts}
+              className="text-sm px-4 py-2 bg-black/5 dark:bg-white/5 border border-[var(--border-main)] text-[var(--text-main)] hover:border-brand-2 transition-colors rounded-xl w-full font-medium"
+            >
               Gerenciar Posts Ocultos
             </button>
           </div>
@@ -194,6 +226,64 @@ export default function CentralPrivacidadePage() {
         </Link>
         
       </div>
+
+      {isHiddenModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[var(--surface)] w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-main)]">
+              <h2 className="text-xl font-bold">Posts Ocultos</h2>
+              <button 
+                onClick={() => setIsHiddenModalOpen(false)}
+                className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              {loadingHidden ? (
+                <div className="animate-pulse space-y-4">
+                  <div className="h-16 bg-[var(--border-main)] rounded-xl"></div>
+                  <div className="h-16 bg-[var(--border-main)] rounded-xl"></div>
+                </div>
+              ) : hiddenPosts.length === 0 ? (
+                <p className="text-center text-[var(--text-secondary)] py-8">Nenhum post oculto.</p>
+              ) : (
+                <div className="space-y-4">
+                  {hiddenPosts.map(post => (
+                    <div key={post.id} className="p-4 border border-[var(--border-main)] rounded-xl space-y-3 relative">
+                      <div className="flex items-center gap-3">
+                        <Image
+                          src={post.author.avatar_url || '/default-avatar.png'}
+                          alt={post.author.name}
+                          width={32}
+                          height={32}
+                          className="rounded-full object-cover"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm leading-tight">{post.author.name}</p>
+                          <p className="text-xs text-[var(--text-secondary)]">@{post.author.handle}</p>
+                        </div>
+                      </div>
+                      <p className="text-sm line-clamp-3 text-[var(--text-secondary)]">{post.content}</p>
+                      {post.book_title && (
+                        <p className="text-xs font-medium text-brand-2 bg-brand-2/10 inline-block px-2 py-1 rounded-md">
+                          📚 {post.book_title}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => handleUnhidePost(post.id)}
+                        className="absolute top-4 right-4 text-xs font-semibold px-3 py-1.5 rounded-full bg-[var(--surface)] border border-[var(--border-main)] hover:border-brand-2 hover:text-brand-2 transition-colors"
+                      >
+                        Reexibir
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

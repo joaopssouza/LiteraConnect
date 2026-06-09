@@ -17,6 +17,8 @@ export interface GoogleBookVolumeInfo {
   language?: string;
   averageRating?: number;
   ratingsCount?: number;
+  pageCount?: number;
+  publishedDate?: string;
 }
 
 export interface GoogleBookItem {
@@ -36,6 +38,8 @@ export interface BookCatalogEntry {
   language?: string;
   averageRating?: number;
   ratingsCount?: number;
+  pageCount?: number;
+  publishedDate?: string;
   updatedAt: Date;
 }
 
@@ -69,15 +73,35 @@ export class GoogleBooksService {
   /**
    * Busca livros mais populares de uma categoria específica.
    */
-  static async fetchPopularByCategory(category: string, maxResults = 10): Promise<BookCatalogEntry[]> {
+  static async fetchPopularByCategory(category: string, maxResults = 40, startIndex = 0): Promise<BookCatalogEntry[]> {
     if (!this.apiKey) {
       console.warn('GOOGLE_BOOKS_API_KEY não está configurada no ambiente.');
       return [];
     }
 
-    const query = encodeURIComponent(`subject:${category}`);
+    const categoryLower = category.toLowerCase();
+    let searchQuery = `livros de ${category}`;
+    
+    const categoryMap: Record<string, string> = {
+      'fiction': 'Ficção',
+      'romance': 'Romance',
+      'fantasy': 'Fantasia',
+      'science fiction': 'Ficção Científica',
+      'thriller': 'Suspense',
+      'mystery': 'Mistério',
+      'young adult': 'Ficção juvenil',
+      'horror': 'Terror',
+      'biography': 'Biografia',
+      'self-help': 'Autoajuda'
+    };
+
+    if (categoryMap[categoryLower]) {
+      searchQuery = `livros de ${categoryMap[categoryLower]}`;
+    }
+
+    const query = encodeURIComponent(searchQuery);
     // Ordenando por relevância para obter os "melhores/mais populares"
-    const url = `${GOOGLE_BOOKS_API_URL}?q=${query}&orderBy=relevance&maxResults=${maxResults}&key=${this.apiKey}&langRestrict=pt`;
+    const url = `${GOOGLE_BOOKS_API_URL}?q=${query}&orderBy=relevance&maxResults=${maxResults}&startIndex=${startIndex}&key=${this.apiKey}&langRestrict=pt`;
 
     try {
       const response = await fetch(url);
@@ -126,6 +150,8 @@ export class GoogleBooksService {
       language: volumeInfo.language,
       averageRating: volumeInfo.averageRating || 0,
       ratingsCount: volumeInfo.ratingsCount || 0,
+      pageCount: volumeInfo.pageCount,
+      publishedDate: volumeInfo.publishedDate,
       updatedAt: new Date(),
     };
   }

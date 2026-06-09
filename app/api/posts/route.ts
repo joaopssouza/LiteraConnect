@@ -33,7 +33,7 @@ export async function POST(req: Request) {
           video_url: video_url || null,
           media: media || [],
           status: 'published',
-          visibility: 'public',
+          visibility: body.visibility || 'public',
         },
       ])
       .select('id')

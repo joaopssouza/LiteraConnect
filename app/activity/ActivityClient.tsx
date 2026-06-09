@@ -181,7 +181,21 @@ export default function ActivityClient() {
 
         <div className="divide-y divide-[var(--border)]">
           {loading ? (
-            <div className="p-8 text-center text-[var(--text-main)]/60">Carregando atividades...</div>
+            <div className="divide-y divide-[var(--border)] animate-pulse">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="p-4 flex gap-4">
+                  <div className="w-6 h-6 rounded-full bg-[var(--border)]/20 flex-shrink-0 mt-1" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-[var(--border)]/20 flex-shrink-0" />
+                      <div className="w-48 h-4 rounded-full bg-[var(--border)]/20" />
+                    </div>
+                    <div className="w-3/4 h-3 rounded-full bg-[var(--border)]/20 mt-3" />
+                    <div className="w-16 h-3 rounded-full bg-[var(--border)]/20 mt-3" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : activities.length > 0 ? (
             Object.entries(groupByDay(activities)).map(([day, items]) => (
               <div key={day}>

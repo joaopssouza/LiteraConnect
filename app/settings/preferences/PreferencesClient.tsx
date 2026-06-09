@@ -5,17 +5,11 @@ import Image from 'next/image';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { usePreferences } from '@/hooks/usePreferences';
 import { PushNotificationToggle } from '@/components/PushNotificationToggle';
-
-const GENRES = [
-  'Fiction', 'Romance', 'Fantasy', 'Science Fiction', 
-  'Thriller', 'Mystery', 'Young Adult', 'Horror', 
-  'Biography', 'Self-Help'
-];
+import { GENRE_HIERARCHY, getSubgenresForMainGenres, getMainGenresFromSubgenres } from '@/lib/genres';
 
 export default function PreferencesClient() {
   const { preferences, updatePreferences, mounted } = usePreferences();
   
-  // Estados para edição das preferências de Onboarding
   const [loadingPrefs, setLoadingPrefs] = useState(true);
   const [userPrefs, setUserPrefs] = useState<{ categories: string[], bookIds: string[], favoriteBooks: any[] }>({
     categories: [],
@@ -25,9 +19,11 @@ export default function PreferencesClient() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [modalStep, setModalStep] = useState(1);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedMainGenres, setSelectedMainGenres] = useState<string[]>([]);
+  const [selectedSubgenres, setSelectedSubgenres] = useState<string[]>([]);
   const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
   const [booksList, setBooksList] = useState<any[]>([]);
+  const [attemptCount, setAttemptCount] = useState(0);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -52,19 +48,27 @@ export default function PreferencesClient() {
   }, []);
 
   const openEditModal = () => {
-    setSelectedGenres(userPrefs.categories);
+    setSelectedSubgenres(userPrefs.categories);
+    setSelectedMainGenres(getMainGenresFromSubgenres(userPrefs.categories));
     setSelectedBooks(userPrefs.bookIds);
     setBooksList(userPrefs.favoriteBooks);
     setModalStep(1);
     setIsEditing(true);
   };
 
-  const toggleGenre = (g: string) => {
-    if (selectedGenres.includes(g)) {
-      setSelectedGenres(prev => prev.filter(x => x !== g));
-    } else if (selectedGenres.length < 5) {
-      setSelectedGenres(prev => [...prev, g]);
+  const toggleMainGenre = (g: string) => {
+    setSelectedSubgenres([]); // Reseta subgêneros e livros
+    setSelectedBooks([]);
+    if (selectedMainGenres.includes(g)) {
+      setSelectedMainGenres(prev => prev.filter(x => x !== g));
+    } else if (selectedMainGenres.length < 5) {
+      setSelectedMainGenres(prev => [...prev, g]);
     }
+  };
+
+  const toggleSubgenre = (g: string) => {
+    if (selectedSubgenres.includes(g)) setSelectedSubgenres(prev => prev.filter(x => x !== g));
+    else if (selectedSubgenres.length < 8) setSelectedSubgenres(prev => [...prev, g]);
   };
 
   const toggleBook = (id: string) => {
@@ -75,29 +79,46 @@ export default function PreferencesClient() {
     }
   };
 
-  const handleNextStep = async () => {
-    if (selectedGenres.length === 0) return;
+  const handleGoToSubgenres = () => {
+    if (selectedMainGenres.length === 0) return;
+    setModalStep(2);
+  };
+
+  const handleFetchBooks = async () => {
+    if (selectedSubgenres.length === 0) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/books/search?q=${encodeURIComponent(selectedGenres[0])}`);
+      const res = await fetch(`/api/books/suggested?categories=${encodeURIComponent(selectedSubgenres.join(','))}&attempt=0`);
       if (res.ok) {
         const data = await res.json();
-        const searched = data.results || [];
-        const mergedBooks = [...userPrefs.favoriteBooks];
-        const existingIds = new Set(mergedBooks.map(b => b._id));
-        
-        for (const book of searched) {
-          if (!existingIds.has(book._id)) {
-            mergedBooks.push(book);
-          }
-        }
-        setBooksList(mergedBooks);
+        setBooksList(data.results || []);
+        setAttemptCount(0);
       }
     } catch (err) {
       console.error(err);
     } finally {
       setSaving(false);
-      setModalStep(2);
+      setModalStep(3);
+    }
+  };
+
+  const fetchMoreBooks = async () => {
+    if (attemptCount >= 10 || selectedSubgenres.length === 0) return;
+    setSaving(true);
+    const nextAttempt = attemptCount + 1;
+    try {
+      const res = await fetch(`/api/books/suggested?categories=${encodeURIComponent(selectedSubgenres.join(','))}&attempt=${nextAttempt}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          setBooksList(data.results);
+        }
+        setAttemptCount(nextAttempt);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -107,7 +128,7 @@ export default function PreferencesClient() {
       const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categories: selectedGenres, bookIds: selectedBooks })
+        body: JSON.stringify({ categories: selectedSubgenres, bookIds: selectedBooks })
       });
       if (res.ok) {
         const resPrefs = await fetch('/api/onboarding');
@@ -136,6 +157,9 @@ export default function PreferencesClient() {
       </div>
     );
   }
+
+  const mainGenresList = Object.keys(GENRE_HIERARCHY);
+  const availableSubgenres = getSubgenresForMainGenres(selectedMainGenres);
 
   return (
     <div className="space-y-8 max-w-xl">
@@ -182,7 +206,6 @@ export default function PreferencesClient() {
 
         <hr className="border-[var(--border)]" />
 
-        {/* Seção de Preferências Literárias do Onboarding */}
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -209,7 +232,7 @@ export default function PreferencesClient() {
                   </span>
                 ))}
                 {userPrefs.categories.length === 0 && (
-                  <span className="text-xs text-[var(--text-main)]/40 italic">Nenhum gênero selecionado.</span>
+                  <span className="text-xs text-[var(--text-main)]/40 italic">Nenhum subgênero selecionado.</span>
                 )}
               </div>
               {userPrefs.favoriteBooks.length > 0 && (
@@ -278,8 +301,19 @@ export default function PreferencesClient() {
             <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-[var(--text-main)]">Interesses Literários</h3>
-                <p className="text-xs text-[var(--text-main)]/60">Passo {modalStep} de 2</p>
+                <p className="text-xs text-[var(--text-main)]/60">Passo {modalStep} de 3</p>
               </div>
+              {modalStep === 3 && attemptCount < 10 && (
+                <button
+                  type="button"
+                  onClick={fetchMoreBooks}
+                  disabled={saving}
+                  className="text-xs font-bold px-3 py-1.5 bg-[var(--bg-main)] border border-[var(--border)] rounded-full hover:border-brand-2 hover:text-brand-2 transition-colors disabled:opacity-50 ml-auto mr-4"
+                  title="Buscar novas opções baseadas nos seus gêneros"
+                >
+                  {saving ? 'Buscando...' : `Novas buscas (${10 - attemptCount})`}
+                </button>
+              )}
               <button 
                 onClick={() => setIsEditing(false)}
                 className="text-[var(--text-main)]/60 hover:text-[var(--text-main)] p-1 rounded-lg hover:bg-[var(--bg-main)] transition-colors"
@@ -292,15 +326,15 @@ export default function PreferencesClient() {
             <div className="p-6 max-h-[60vh] overflow-y-auto">
               {modalStep === 1 ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-[var(--text-main)]/70">Selecione até 5 gêneros favoritos:</p>
+                  <p className="text-sm text-[var(--text-main)]/70">Selecione os grandes gêneros favoritos:</p>
                   <div className="flex flex-wrap gap-2 py-2">
-                    {GENRES.map(g => {
-                      const isSelected = selectedGenres.includes(g);
+                    {mainGenresList.map(g => {
+                      const isSelected = selectedMainGenres.includes(g);
                       return (
                         <button
                           key={g}
                           type="button"
-                          onClick={() => toggleGenre(g)}
+                          onClick={() => toggleMainGenre(g)}
                           className={`px-4 py-2 text-sm rounded-full border transition-all ${
                             isSelected 
                               ? 'bg-brand-2 border-brand-2 text-white shadow'
@@ -312,7 +346,30 @@ export default function PreferencesClient() {
                       );
                     })}
                   </div>
-                  <p className="text-xs text-[var(--text-main)]/50">Selecionados: {selectedGenres.length} de 5</p>
+                </div>
+              ) : modalStep === 2 ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-[var(--text-main)]/70">Selecione até 8 subgêneros favoritos:</p>
+                  <div className="flex flex-wrap gap-2 py-2">
+                    {availableSubgenres.map(g => {
+                      const isSelected = selectedSubgenres.includes(g);
+                      return (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => toggleSubgenre(g)}
+                          className={`px-4 py-2 text-sm rounded-full border transition-all ${
+                            isSelected 
+                              ? 'bg-brand-2 border-brand-2 text-white shadow'
+                              : 'border-[var(--border)] hover:border-brand-2/50 text-[var(--text-main)]/80 hover:bg-[var(--bg-main)]'
+                          }`}
+                        >
+                          {g}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-[var(--text-main)]/50">Selecionados: {selectedSubgenres.length} de 8</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -324,22 +381,27 @@ export default function PreferencesClient() {
                         <div 
                           key={b._id} 
                           onClick={() => toggleBook(b._id)}
-                          className={`relative cursor-pointer transition-all rounded-lg overflow-hidden group aspect-[2/3] border ${
-                            isSelected ? 'ring-4 ring-brand-2 border-brand-2 scale-95 shadow-lg' : 'border-[var(--border)] hover:scale-105'
+                          className={`flex flex-col gap-1 cursor-pointer transition-transform ${
+                            isSelected ? 'scale-95 ring-4 ring-brand-2 rounded-lg p-1 bg-brand-2/10' : 'hover:scale-105'
                           }`}
                           title={b.title}
                         >
-                          {b.thumbnail ? (
-                            <Image src={b.thumbnail} alt={b.title} fill className="object-cover" unoptimized />
-                          ) : (
-                            <div className="absolute inset-0 bg-[var(--border)] flex items-center justify-center p-2 text-center text-[10px] line-clamp-4">
-                              {b.title}
+                          <p className="text-[10px] font-semibold text-center line-clamp-1 truncate w-full">{b.title}</p>
+                          <div className={`relative w-full aspect-[2/3] rounded-lg overflow-hidden border ${
+                            isSelected ? 'border-brand-2 shadow-lg' : 'border-[var(--border)]'
+                          }`}>
+                            {b.thumbnail ? (
+                              <Image src={b.thumbnail} alt={b.title} fill className="object-cover" unoptimized />
+                            ) : (
+                              <div className="absolute inset-0 bg-[var(--border)] flex items-center justify-center p-2 text-center text-[10px] line-clamp-4">
+                                {b.title}
+                              </div>
+                            )}
+                            <div className={`absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${isSelected ? 'opacity-100 bg-brand-2/20' : ''}`}>
+                              <span className="text-white text-xs font-bold bg-black/60 px-2 py-1 rounded">
+                                {isSelected ? '✓' : 'Selecionar'}
+                              </span>
                             </div>
-                          )}
-                          <div className={`absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${isSelected ? 'opacity-100 bg-brand-2/20' : ''}`}>
-                            <span className="text-white text-xs font-bold bg-black/60 px-2 py-1 rounded">
-                              {isSelected ? '✓' : 'Selecionar'}
-                            </span>
                           </div>
                         </div>
                       );
@@ -355,10 +417,19 @@ export default function PreferencesClient() {
 
             {/* Footer */}
             <div className="p-6 border-t border-[var(--border)] bg-[var(--bg-main)] flex justify-between gap-3">
-              {modalStep === 2 ? (
+              {modalStep > 1 ? (
                 <button
                   type="button"
-                  onClick={() => setModalStep(1)}
+                  onClick={() => {
+                    if (modalStep === 3) {
+                      setSelectedBooks([]);
+                      setModalStep(2);
+                    } else if (modalStep === 2) {
+                      setSelectedSubgenres([]);
+                      setSelectedBooks([]);
+                      setModalStep(1);
+                    }
+                  }}
                   disabled={saving}
                   className="px-5 py-2.5 text-sm font-semibold rounded-xl border border-[var(--border)] text-[var(--text-main)]/80 hover:bg-[var(--surface)] transition-all"
                 >
@@ -380,17 +451,26 @@ export default function PreferencesClient() {
                 {modalStep === 1 ? (
                   <button
                     type="button"
-                    onClick={handleNextStep}
-                    disabled={selectedGenres.length === 0 || saving}
+                    onClick={handleGoToSubgenres}
+                    disabled={selectedMainGenres.length === 0}
                     className="px-5 py-2.5 text-sm font-bold bg-brand-2 text-white rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity shadow"
                   >
-                    {saving ? 'Carregando livros...' : 'Avançar'}
+                    Avançar
+                  </button>
+                ) : modalStep === 2 ? (
+                  <button
+                    type="button"
+                    onClick={handleFetchBooks}
+                    disabled={selectedSubgenres.length === 0 || saving}
+                    className="px-5 py-2.5 text-sm font-bold bg-brand-2 text-white rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity shadow"
+                  >
+                    {saving ? 'Buscando livros...' : 'Avançar'}
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={handleSaveInterests}
-                    disabled={saving}
+                    disabled={saving || selectedBooks.length === 0}
                     className="px-5 py-2.5 text-sm font-bold bg-brand-2 text-white rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity shadow"
                   >
                     {saving ? 'Salvando...' : 'Salvar Preferências'}

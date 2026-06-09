@@ -102,11 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
     
-    // Configura a presença global
-    const syncPresence = () => {
-      if (!globalPresenceRef.current) return;
-      const state = globalPresenceRef.current.presenceState();
-      setOnlineUserIds(Array.from(new Set(Object.values(state).flat().map((p: any) => p.user_id).filter(Boolean))));
+    // Configura a presença global de forma robusta
+    const syncPresence = (channelInstance: any) => {
+      if (!channelInstance) return;
+      const state = channelInstance.presenceState();
+      setOnlineUserIds(Array.from(new Set(Object.values(state).flat().map((p: any) => p.user_id).filter(Boolean) as string[])));
     };
 
     if (globalPresenceRef.current) {
@@ -115,13 +115,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const ch = supabase
       .channel('online:users', { config: { presence: { key: user.id } } })
-      .on('presence', { event: 'sync' }, syncPresence)
-      .on('presence', { event: 'join' }, syncPresence)
-      .on('presence', { event: 'leave' }, syncPresence)
+      .on('presence', { event: 'sync' }, () => syncPresence(ch))
+      .on('presence', { event: 'join' }, () => syncPresence(ch))
+      .on('presence', { event: 'leave' }, () => syncPresence(ch))
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await ch.track({ user_id: user.id });
-          syncPresence();
+          syncPresence(ch);
         }
       });
 

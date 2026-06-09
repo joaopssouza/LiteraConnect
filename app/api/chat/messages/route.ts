@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAuth, isAuthError } from '@/lib/auth-utils';
 import { buildServerCacheKey, invalidateServerCacheByPrefix } from '@/lib/server-cache';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { broadcastToChatChannel } from '@/lib/realtime-broadcast';
 
 export async function GET(request: Request) {
   const auth = await requireAuth(request);
@@ -119,6 +120,9 @@ export async function POST(request: Request) {
       if (p?.user_id) invalidateServerCacheByPrefix(buildServerCacheKey('chat', 'conversations', p.user_id));
     });
 
+    // Envio manual em tempo real via canal (broadcast HTTP direto ao Realtime interno)
+    await broadcastToChatChannel(conversationId, 'new_message', { message: data });
+
     return NextResponse.json({ message: data });
   } catch (err: any) {
     console.error('Chat messages POST error:', err);
@@ -126,7 +130,7 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH — editar conteúdo, soft-delete ou adicionar/remover reação
+// PATCH — editar conteúdo, soft-delete, reação OU marcar como lido (action: 'mark_read')
 export async function PATCH(request: Request) {
   const auth = await requireAuth(request);
   if (isAuthError(auth)) return auth;
@@ -135,7 +139,26 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json();
-    const { messageId, action, content, emoji } = body;
+    const { messageId, action, content, emoji, conversationId: bodyConversationId } = body;
+
+    // Acao especial: marcar conversa como lida e emitir read_receipt em tempo real
+    if (action === 'mark_read' && bodyConversationId) {
+      const nowIso = new Date().toISOString();
+      await supabase
+        .from('conversation_participants')
+        .update({ last_read_at: nowIso })
+        .eq('conversation_id', bodyConversationId)
+        .eq('user_id', user.id);
+
+      // Emite evento em tempo real para o outro participante atualizar os ticks azuis
+      await broadcastToChatChannel(bodyConversationId, 'read_receipt', {
+        user_id: user.id,
+        conversation_id: bodyConversationId,
+        read_at: nowIso
+      });
+
+      return NextResponse.json({ ok: true, read_at: nowIso });
+    }
 
     if (!messageId || !action) {
       return NextResponse.json({ error: 'messageId e action são obrigatórios.' }, { status: 400 });
@@ -194,6 +217,10 @@ export async function PATCH(request: Request) {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // Emite evento em tempo real de edicao, exclusao ou reacao via broadcast HTTP direto
+    await broadcastToChatChannel(msg.conversation_id, 'update_message', { message: updated });
+
     return NextResponse.json({ message: updated });
   } catch (err: any) {
     console.error('Chat messages PATCH error:', err);

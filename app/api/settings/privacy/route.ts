@@ -39,14 +39,20 @@ export async function GET(request: Request) {
       avatar_url: item.users?.avatar_url,
     }));
 
-    // For simplicity, we assume hidden posts are tracked in Redis.
-    // If you need to return them, implement Redis fetching here.
-    const hiddenPostsCount = 0; // Placeholder
+    // Fetch hidden posts count
+    const { count: hiddenPostsCount, error: hiddenError } = await supabaseAdmin
+      .from('hidden_posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (hiddenError) {
+      console.error('Error fetching hidden posts count:', hiddenError);
+    }
 
     return NextResponse.json({
       is_private: userData?.is_private ?? false,
       blocked_users: blockedUsers,
-      hiddenPostsCount
+      hiddenPostsCount: hiddenPostsCount || 0
     });
   } catch (error: any) {
     console.error('Privacy GET error:', error);

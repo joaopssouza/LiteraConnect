@@ -15,10 +15,14 @@ export async function PATCH(request: Request) {
     const rawBio = String(body.bio || '').trim();
 
     if (!rawName) return NextResponse.json({ error: 'Nome é obrigatório.' }, { status: 400 });
-    if (!rawHandle || rawHandle.length < 3)
-      return NextResponse.json({ error: '@handle precisa ter ao menos 3 caracteres.' }, { status: 400 });
-    if (rawBio.length > 220)
-      return NextResponse.json({ error: 'Bio excede 220 caracteres.' }, { status: 400 });
+    if (rawName.length > 40)
+      return NextResponse.json({ error: 'Nome excede 40 caracteres.' }, { status: 400 });
+    if (!rawHandle || rawHandle.length < 2)
+      return NextResponse.json({ error: '@handle precisa ter ao menos 2 caracteres.' }, { status: 400 });
+    if (rawHandle.length > 10)
+      return NextResponse.json({ error: '@handle excede 10 caracteres.' }, { status: 400 });
+    if (rawBio.length > 350)
+      return NextResponse.json({ error: 'Bio excede 350 caracteres.' }, { status: 400 });
 
     // Verifica unicidade do handle (exceto o próprio usuário)
     const { data: conflict } = await supabase

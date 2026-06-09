@@ -11,6 +11,7 @@ import { resolveAvatarUrl } from '@/lib/avatar';
 import { queueView } from '@/lib/view-buffer';
 import { usePreferences } from '@/hooks/usePreferences';
 import { MediaViewerModal } from './MediaViewerModal';
+import { CustomVideoPlayer } from './CustomVideoPlayer';
 
 async function incrementPostShares(postId: string) {
   try {
@@ -59,6 +60,16 @@ const getRepostDepth = (postContent: string) => {
   return matches ? matches.length : 0;
 };
 
+function formatDisplayName(name?: string) {
+  if (!name) return '';
+  const trimmed = name.trim();
+  const parts = trimmed.split(/\s+/);
+  if (parts.length > 2) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+  return trimmed;
+}
+
 interface PostProps {
   id: string;
   authorId?: string;
@@ -82,9 +93,10 @@ interface PostProps {
   onLocalPostPreferenceChange?: () => void;
   recent_comments?: any[];
   hideCommentInput?: boolean;
+  visibility?: string;
 }
 
-export function PostCard({ id, authorId, author, content, bookTitle, bookCover, media: initialMedia, likes: initialLikes, comments: initialComments, recent_comments, hideCommentInput = false, reposts, views, shares, timeAgo, skipFetchCounts = false, imagePriority = false, onLocalPostPreferenceChange }: PostProps) {
+export function PostCard({ id, authorId, author, content, bookTitle, bookCover, media: initialMedia, likes: initialLikes, comments: initialComments, recent_comments, hideCommentInput = false, visibility = 'public', reposts, views, shares, timeAgo, skipFetchCounts = false, imagePriority = false, onLocalPostPreferenceChange }: PostProps) {
   const { user, profile } = useAuth();
   const { preferences } = usePreferences();
   const router = useRouter();
@@ -111,6 +123,9 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
   const [editContent, setEditContent] = useState(content);
   const [editRepostComment, setEditRepostComment] = useState('');
   const [editBookTitle, setEditBookTitle] = useState(bookTitle || '');
+  const [editVisibility, setEditVisibility] = useState(visibility);
+  const [editBookCover, setEditBookCover] = useState<string | null>(bookCover || null);
+  const [editMedia, setEditMedia] = useState<any[]>(initialMedia || []);
   const [isSavingPost, setIsSavingPost] = useState(false);
   const [isDeletingPost, setIsDeletingPost] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState<number | null>(null);
@@ -259,6 +274,16 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
     return [];
   }, [initialMedia, bookCover]);
 
+  const editMediaList = useMemo(() => {
+    if (editMedia && editMedia.length > 0) return editMedia;
+    if (editBookCover) {
+      const isVideo = editBookCover.match(/\.(mp4|webm|ogg|mov)$/i) || editBookCover.includes('video/');
+      const url = isVideo ? (editBookCover.includes('#t=') ? editBookCover : `${editBookCover}#t=2.0`) : editBookCover;
+      return [{ url, type: isVideo ? 'video' : 'image' } as const];
+    }
+    return [];
+  }, [editMedia, editBookCover]);
+
   const [modalState, setModalState] = useState<ModalState>({
     open: false,
     title: '',
@@ -383,7 +408,9 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
       setEditRepostComment('');
     }
     setEditBookTitle(bookTitle || '');
-  }, [content, bookTitle, repostPreview]);
+    setEditBookCover(bookCover || null);
+    setEditMedia(initialMedia || []);
+  }, [content, bookTitle, repostPreview, bookCover, initialMedia]);
 
   useEffect(() => {
     if (!repostPreview) {
@@ -532,6 +559,9 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
         .update({
           content: contentToSave,
           book_title: editBookTitle.trim() ? editBookTitle.trim() : null,
+          visibility: editVisibility,
+          book_cover_url: editBookCover,
+          media: editMedia,
         })
         .eq('id', id)
         .eq('user_id', user.id);
@@ -582,11 +612,39 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
     }
   };
 
+  const handleHidePost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMenuOpen(false);
+    setIsHidden(true);
+    try {
+      await fetch(`/api/posts/${id}/hide`, { method: 'POST' });
+      openModal('Post oculto', 'Este post não aparecerá mais no seu feed. Você pode gerenciar na Central de Privacidade.');
+    } catch (err) {
+      setIsHidden(false);
+    }
+  };
+
+  const handleReportPost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMenuOpen(false);
+    setIsHidden(true);
+    try {
+      await fetch(`/api/posts/${id}/report`, { method: 'POST' });
+      openModal('Conteúdo denunciado', 'Agradecemos por ajudar a manter nossa comunidade segura. O post foi ocultado para você.');
+    } catch (err) {
+      setIsHidden(false);
+    }
+  };
+
   if (isHidden) return null;
 
   return (
     <article
-      className="p-4 border-b border-[var(--border)] bg-[var(--surface)] hover:opacity-95 transition-opacity"
+      className={cn(
+        "p-4 border-b border-[var(--border)] bg-[var(--surface)] transition-opacity",
+        !(isRepostModalOpen || isEditPostModalOpen || isTrashModalOpen || modalState.open) && "hover:opacity-95",
+        (isRepostModalOpen || isEditPostModalOpen || isTrashModalOpen || modalState.open) && "relative z-[110]"
+      )}
     >
       <div className="flex gap-3">
         <div
@@ -603,17 +661,17 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
             unoptimized
           />
         </div>
-        <div className="flex-1 flex flex-col justify-center">
-          <div className="flex items-start justify-between">
-            <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-[var(--text-main)] hover:underline" onClick={handleProfileClick}>
-                  {author.name}
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+              <div className="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0">
+                <span className="font-bold text-[var(--text-main)] hover:underline truncate" onClick={handleProfileClick}>
+                  {formatDisplayName(author.name)}
                 </span>
-                <span className="text-[var(--text-main)]/60 text-sm" onClick={handleProfileClick}>
+                <span className="text-[var(--text-main)]/60 text-xs sm:text-sm truncate" onClick={handleProfileClick}>
                   @{author.handle}
                 </span>
-                <span className="text-[var(--text-main)]/60 text-sm">· {timeAgo}</span>
+                <span className="text-[var(--text-main)]/60 text-xs sm:text-sm whitespace-nowrap">· {timeAgo}</span>
               </div>
               {bookTitle && (
                 <div className="relative" ref={shelfMenuRef}>
@@ -691,9 +749,14 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
                   <button onClick={(e) => { e.stopPropagation(); const now = toggleArrayPreference('saved-posts', id); setIsSaved(now); setIsMenuOpen(false); }} className="w-full px-4 py-2 text-left text-sm text-[var(--text-main)] hover:bg-[var(--border)]/20 flex items-center gap-2">
                     <Bookmark className="w-4 h-4" /> {isSaved ? 'Remover dos salvos' : 'Salvar post'}
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); toggleArrayPreference('hidden-posts', id); setIsHidden(true); setIsMenuOpen(false); }} className="w-full px-4 py-2 text-left text-sm text-[var(--text-main)] hover:bg-[var(--border)]/20 flex items-center gap-2">
+                  <button onClick={handleHidePost} className="w-full px-4 py-2 text-left text-sm text-[var(--text-main)] hover:bg-[var(--border)]/20 flex items-center gap-2">
                     <EyeOff className="w-4 h-4" /> Ocultar post
                   </button>
+                  {!isOwner && (
+                    <button onClick={handleReportPost} className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-2 border-b border-[var(--border)]">
+                      <Shield className="w-4 h-4" /> Denunciar conteúdo
+                    </button>
+                  )}
                   {isOwner && (
                     <>
                       <div className="my-1 border-t border-[var(--border)]" />
@@ -751,21 +814,24 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
                   )}
                 >
                   {item.type === 'video' ? (
-                    <div className="relative w-full h-full group">
-                      <video
-                        src={item.url.includes('#t=') ? item.url : `${item.url}#t=2.0`}
-                        className="w-full h-full object-contain opacity-80"
-                        controls={mediaList.length === 1}
-                        controlsList="nodownload"
-                        playsInline
-                        preload="metadata"
-                      />
-                      {mediaList.length > 1 && (
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:bg-black/20 transition-colors">
-                          <div className="bg-black/50 backdrop-blur-md p-3 rounded-full border border-white/20">
-                            <Play className="w-8 h-8 text-white fill-current" />
+                    <div className="relative w-full h-full group flex">
+                      {mediaList.length === 1 ? (
+                        <CustomVideoPlayer src={item.url} className="w-full h-full" autoPlay={false} />
+                      ) : (
+                        <>
+                          <video
+                            src={item.url.includes('#t=') ? item.url : `${item.url}#t=2.0`}
+                            className="w-full h-full object-contain opacity-80 pointer-events-none"
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:bg-black/20 transition-colors">
+                            <div className="bg-black/50 backdrop-blur-md p-3 rounded-full border border-white/20 shadow-lg group-hover:scale-110 transition-transform">
+                              <Play className="w-8 h-8 text-white fill-current translate-x-0.5" />
+                            </div>
                           </div>
-                        </div>
+                        </>
                       )}
                     </div>
                   ) : (
@@ -818,8 +884,21 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
 
           {/* Comentários compactos e campo de input para todos os posts */}
           <div className="mt-4 border-t border-[var(--border)] pt-3">
-              {feedComments && feedComments.length > 0 && (
+              {((feedComments && feedComments.length > 0) || isSubmittingComment) && (
                 <div className="space-y-2 mb-3">
+                  {isSubmittingComment && (
+                    <div className="flex flex-col gap-1 animate-pulse">
+                      <div className="flex gap-2 text-sm items-start">
+                        <div className="w-6 h-6 rounded-full bg-[var(--border)]/60 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="bg-[var(--text-main)]/10 rounded-xl px-3 py-1.5 space-y-1.5">
+                            <div className="h-3 bg-[var(--border)]/60 rounded w-1/4" />
+                            <div className="h-3.5 bg-[var(--border)]/40 rounded w-5/6" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {feedComments.map(cmt => {
                     const isOwnerCmt = user?.id === cmt.user_id;
                     const isEditingThis = editingFeedCommentId === cmt.id;
@@ -994,12 +1073,42 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
                     placeholder="Título do livro"
                     className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30"
                   />
+                  <select
+                    value={editVisibility}
+                    onChange={(e) => setEditVisibility(e.target.value)}
+                    className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30"
+                  >
+                    <option value="public">🌍 Público</option>
+                    <option value="followers">👥 Seguidores</option>
+                    <option value="private">🔒 Privado</option>
+                  </select>
                   <textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
                     rows={4}
                     className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2 text-[var(--text-main)] outline-none focus:ring-2 focus:ring-brand-2/30 resize-none"
                   />
+
+                  {editMediaList.length > 0 && (
+                    <div className="relative mt-2 rounded-xl overflow-hidden border border-[var(--border)] bg-black/5 aspect-video flex items-center justify-center">
+                      {editMediaList[0].type === 'video' ? (
+                        <video src={editMediaList[0].url} className="max-h-40 object-contain animate-in fade-in" controls />
+                      ) : (
+                        <img src={editMediaList[0].url} alt="Preview" className="max-h-40 object-contain animate-in fade-in" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditBookCover(null);
+                          setEditMedia([]);
+                        }}
+                        className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full transition-colors"
+                        title="Remover mídia"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

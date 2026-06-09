@@ -29,6 +29,8 @@ alter_*.py
 update_*.py
 remove_*.py
 fix-ssr.js
+test-*.js
+test-*.ts
 
 # Pacotes de deploy e backups
 deploy*.tar.gz
