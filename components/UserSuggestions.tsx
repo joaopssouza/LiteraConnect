@@ -128,7 +128,18 @@ export function UserSuggestions({ title = 'Pessoas para seguir' }: { title?: str
       </div>
 
       {loading ? (
-        <div className="p-6 text-sm text-[var(--text-main)]/40 font-medium text-center italic">Carregando sugestões...</div>
+        <div className="flex flex-col">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="p-4 flex items-center gap-3 animate-pulse">
+              <div className="w-11 h-11 rounded-full bg-[var(--border)]/20 flex-shrink-0 border border-[var(--border)]/10" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-4 bg-[var(--border)]/20 rounded w-2/3" />
+                <div className="h-3 bg-[var(--border)]/10 rounded w-1/2" />
+              </div>
+              <div className="w-16 h-7 rounded-full bg-[var(--border)]/20 flex-shrink-0" />
+            </div>
+          ))}
+        </div>
       ) : users.length === 0 ? (
         <div className="p-6 text-sm text-[var(--text-main)]/40 font-medium text-center">Sem sugestões no momento.</div>
       ) : (

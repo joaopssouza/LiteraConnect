@@ -32,7 +32,7 @@ const SkeletonPosts = () => (
 );
 
 export default function HomeClient() {
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const { posts, loading, isLoadingMore, hasMore, error, loadInitial, sentinelRef } = useFeed();
 
   const [content, setContent] = useState('');
@@ -169,12 +169,21 @@ export default function HomeClient() {
               </div>
 
               <div className="flex gap-4 items-center">
-                <div className="hidden sm:flex rounded-full overflow-hidden border border-[var(--border)]/40 bg-[var(--surface)]/50 shadow-sm p-1">
+                <div className="hidden sm:grid grid-cols-3 relative rounded-full border border-[var(--border)]/40 bg-[var(--surface)]/50 shadow-sm p-1 w-[290px] select-none">
+                  {/* Sliding background indicator */}
+                  <div 
+                    className="absolute top-1 bottom-1 left-1 rounded-full bg-brand-2 shadow-md transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] z-0"
+                    style={{
+                      width: 'calc(33.333% - 2.666px)',
+                      transform: `translateX(${visibility === 'public' ? '0%' : visibility === 'followers' ? '100%' : '200%'})`
+                    }}
+                  />
+                  
                   <button
                     type="button"
                     onClick={() => setVisibility('public')}
-                    className={`inline-flex items-center px-4 py-1.5 text-xs font-bold rounded-full transition-all ${
-                      visibility === 'public' ? 'bg-brand-2 text-white shadow-md' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
+                    className={`relative z-10 inline-flex items-center justify-center px-4 py-1.5 text-xs font-bold rounded-full transition-colors duration-300 cursor-pointer ${
+                      visibility === 'public' ? 'text-white' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
                     }`}
                   >
                     <Globe size={14} className="mr-1.5" /> Público
@@ -182,8 +191,8 @@ export default function HomeClient() {
                   <button
                     type="button"
                     onClick={() => setVisibility('followers')}
-                    className={`inline-flex items-center px-4 py-1.5 text-xs font-bold rounded-full transition-all ${
-                      visibility === 'followers' ? 'bg-brand-2 text-white shadow-md' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
+                    className={`relative z-10 inline-flex items-center justify-center px-4 py-1.5 text-xs font-bold rounded-full transition-colors duration-300 cursor-pointer ${
+                      visibility === 'followers' ? 'text-white' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
                     }`}
                   >
                     <Users size={14} className="mr-1.5" /> Seguidores
@@ -191,8 +200,8 @@ export default function HomeClient() {
                   <button
                     type="button"
                     onClick={() => setVisibility('private')}
-                    className={`inline-flex items-center px-4 py-1.5 text-xs font-bold rounded-full transition-all ${
-                      visibility === 'private' ? 'bg-brand-2 text-white shadow-md' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
+                    className={`relative z-10 inline-flex items-center justify-center px-4 py-1.5 text-xs font-bold rounded-full transition-colors duration-300 cursor-pointer ${
+                      visibility === 'private' ? 'text-white' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
                     }`}
                   >
                     <Lock size={14} className="mr-1.5" /> Privado
@@ -283,21 +292,21 @@ export default function HomeClient() {
           {/* Opcional: Perfil do usuário reduzido como no Instagram */}
           {user && (
             <div className="flex items-center gap-4 mb-6 px-2">
-              <Link href={`/profile/${user.user_metadata?.handle || ''}`} className="w-14 h-14 rounded-full bg-[var(--border)]/20 relative overflow-hidden flex-shrink-0 cursor-pointer">
-                {user.user_metadata?.avatar_url ? (
-                  <img src={resolveAvatarUrl(user.user_metadata.avatar_url, user.user_metadata?.handle || '', 100)} alt="Perfil" className="w-full h-full object-cover" />
+              <Link href={`/profile/${profile?.handle || user.user_metadata?.handle || ''}`} className="w-14 h-14 rounded-full bg-[var(--border)]/20 relative overflow-hidden flex-shrink-0 cursor-pointer">
+                {profile?.avatar_url || user.user_metadata?.avatar_url ? (
+                  <img src={resolveAvatarUrl(profile?.avatar_url || user.user_metadata.avatar_url, profile?.handle || user.user_metadata?.handle || '', 100)} alt="Perfil" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-lg font-bold text-[var(--text-main)]">
-                    {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                    {profile?.name?.charAt(0) || user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
                   </div>
                 )}
               </Link>
               <div className="flex-1 min-w-0">
-                <Link href={`/profile/${user.user_metadata?.handle || ''}`} className="font-bold text-sm text-[var(--text-main)] hover:underline block truncate">
-                  {user.user_metadata?.handle || 'usuario'}
+                <Link href={`/profile/${profile?.handle || user.user_metadata?.handle || ''}`} className="font-bold text-sm text-[var(--text-main)] hover:underline block truncate cursor-pointer">
+                  {profile?.handle || user.user_metadata?.handle || 'usuario'}
                 </Link>
                 <div className="text-sm text-[var(--text-main)]/50 truncate">
-                  {user.user_metadata?.full_name || ''}
+                  {(profile?.name || user.user_metadata?.full_name || '').trim().split(/\s+/).slice(0, 2).join(' ')}
                 </div>
               </div>
               <button onClick={() => signOut()} className="text-xs font-bold text-red-500 hover:underline cursor-pointer">
@@ -310,25 +319,11 @@ export default function HomeClient() {
           {/* Footer Sidebar */}
           <div className="mt-8 px-2 text-xs text-[var(--text-main)]/40 font-medium leading-relaxed">
             <div className="flex flex-wrap gap-x-2 gap-y-1 mb-4">
-              <Link href="/sobre" className="hover:underline">Sobre</Link>
-              <span>·</span>
               <Link href="/settings/ajuda" className="hover:underline">Ajuda</Link>
-              <span>·</span>
-              <Link href="/imprensa" className="hover:underline">Imprensa</Link>
-              <span>·</span>
-              <Link href="/api" className="hover:underline">API</Link>
-              <span>·</span>
-              <Link href="/carreiras" className="hover:underline">Carreiras</Link>
               <span>·</span>
               <Link href="/settings/central-privacidade" className="hover:underline">Privacidade</Link>
               <span>·</span>
               <Link href="/termos" className="hover:underline">Termos</Link>
-              <span>·</span>
-              <Link href="/localizacoes" className="hover:underline">Localizações</Link>
-              <span>·</span>
-              <span className="cursor-pointer hover:underline">Idioma</span>
-              <span>·</span>
-              <span className="cursor-pointer hover:underline">LiteraConnect Verified</span>
             </div>
             <div className="uppercase tracking-wide">
               © {new Date().getFullYear()} LITERACONNECT

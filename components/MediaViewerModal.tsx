@@ -357,7 +357,7 @@ export function MediaViewerModal({
         <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
           <button 
             onClick={(e) => { e.stopPropagation(); onClose(); }}
-            className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors pointer-events-auto"
+            className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors pointer-events-auto cursor-pointer"
           >
             <X className="w-6 h-6" />
           </button>

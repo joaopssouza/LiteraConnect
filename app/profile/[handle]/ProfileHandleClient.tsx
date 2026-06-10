@@ -60,12 +60,12 @@ const SkeletonPosts = () => (
 );
 
 const SkeletonProfile = () => (
-  <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)] animate-pulse">
-    <div className="sticky top-0 z-10 bg-[var(--bg-main)]/80 border-b border-[var(--border)] p-4 space-y-2">
+  <div className="max-w-2xl mx-auto w-full min-h-screen bg-[var(--bg-main)] animate-pulse">
+    <div className="sticky top-0 z-10 bg-[var(--bg-main)]/85 border-b border-[var(--border)]/10 pt-6 pb-4 px-4 sm:px-6 space-y-2">
       <div className="h-5 bg-[var(--border)]/20 rounded w-32"></div>
       <div className="h-3 bg-[var(--border)]/20 rounded w-20"></div>
     </div>
-    <div className="p-6 border-b border-[var(--border)] bg-[var(--surface)]">
+    <div className="p-6 border-b border-[var(--border)]/10 bg-[var(--surface)]/30">
       <div className="flex justify-between items-start">
         <div className="w-24 h-24 rounded-full bg-[var(--border)]/20 shrink-0"></div>
         <div className="w-24 h-8 rounded-full bg-[var(--border)]/20"></div>
@@ -579,7 +579,7 @@ export default function ProfileHandleClient() {
   }
 
   if (!profile) {
-    return <div className="max-w-2xl mx-auto w-full sm:border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)] p-8 text-center text-[var(--text-main)]/60">Perfil não encontrado.</div>;
+    return <div className="max-w-2xl mx-auto w-full min-h-screen bg-[var(--bg-main)] p-8 text-center text-[var(--text-main)]/60">Perfil não encontrado.</div>;
   }
 
   const isOwnProfile = currentUser?.id === profile.id;
@@ -587,13 +587,13 @@ export default function ProfileHandleClient() {
   const visiblePosts = isShowingSaved ? savedPosts : posts;
 
   return (
-    <div className="max-w-2xl mx-auto w-full sm:border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)]">
-      <header className="sticky top-0 z-10 bg-[var(--bg-main)]/80 backdrop-blur-md border-b border-[var(--border)] p-4">
-        <h1 className="text-xl font-bold text-[var(--text-main)]">{profile.name}</h1>
-        <p className="text-sm text-[var(--text-main)]/60">@{profile.handle}</p>
+    <div className="max-w-2xl mx-auto w-full min-h-screen bg-[var(--bg-main)]">
+      <header className="sticky top-0 z-10 bg-[var(--bg-main)]/85 backdrop-blur-xl border-b border-[var(--border)]/10 pt-6 pb-4 px-4 sm:px-6 flex flex-col justify-center">
+        <h1 className="text-[22px] font-black tracking-tight text-[var(--text-main)]">{profile.name}</h1>
+        <p className="text-xs text-[var(--text-main)]/50 font-medium">@{profile.handle}</p>
       </header>
 
-      <div className="p-6 border-b border-[var(--border)] bg-[var(--surface)]">
+      <div className="p-6 border-b border-[var(--border)]/10 bg-[var(--surface)]/30">
         <div className="flex justify-between items-start">
           <div className="relative">
             <div className="w-24 h-24 rounded-full bg-brand-2 flex-shrink-0 flex items-center justify-center text-white font-bold overflow-hidden relative border-4 border-[var(--surface)] shadow-sm group">
@@ -685,7 +685,7 @@ export default function ProfileHandleClient() {
         </div>
       </div>
 
-      <div className="border-b border-[var(--border)] bg-[var(--bg-main)] px-4">
+      <div className="border-b border-[var(--border)]/10 bg-[var(--bg-main)] px-4">
         <div className="flex gap-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab('posts')}
@@ -731,7 +731,7 @@ export default function ProfileHandleClient() {
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-[var(--border)]">
+        <div className="divide-y divide-[var(--border)]/10">
         {activeTab === 'bookshelf' ? (
           isLoadingBookshelf ? (
             <SkeletonBookshelf />
