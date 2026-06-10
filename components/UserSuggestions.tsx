@@ -15,6 +15,13 @@ type SuggestedUser = {
   bio: string | null;
 };
 
+const formatDisplayName = (name: string) => {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 2) return name;
+  return `${parts[0]} ${parts[1]}`;
+};
+
 type FollowMap = Record<string, boolean>;
 
 export function UserSuggestions({ title = 'Pessoas para seguir' }: { title?: string }) {
@@ -125,7 +132,7 @@ export function UserSuggestions({ title = 'Pessoas para seguir' }: { title?: str
       ) : users.length === 0 ? (
         <div className="p-6 text-sm text-[var(--text-main)]/40 font-medium text-center">Sem sugestões no momento.</div>
       ) : (
-        <div className="divide-y divide-[var(--border)]">
+        <div className="flex flex-col">
           {users.map((person) => {
             const isFollowing = !!followMap[person.id];
             const isPending = pendingId === person.id;
@@ -146,7 +153,7 @@ export function UserSuggestions({ title = 'Pessoas para seguir' }: { title?: str
 
                 <div className="min-w-0 flex-1">
                   <Link href={`/profile/${person.handle}`} className="font-bold text-[var(--text-main)] hover:underline block truncate text-sm">
-                    {person.name}
+                    {formatDisplayName(person.name)}
                   </Link>
                   <Link href={`/profile/${person.handle}`} className="text-xs text-[var(--text-main)]/50 hover:underline block truncate">
                     @{person.handle}

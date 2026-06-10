@@ -579,7 +579,7 @@ export default function ProfileHandleClient() {
   }
 
   if (!profile) {
-    return <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)] p-8 text-center text-[var(--text-main)]/60">Perfil não encontrado.</div>;
+    return <div className="max-w-2xl mx-auto w-full sm:border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)] p-8 text-center text-[var(--text-main)]/60">Perfil não encontrado.</div>;
   }
 
   const isOwnProfile = currentUser?.id === profile.id;
@@ -587,7 +587,7 @@ export default function ProfileHandleClient() {
   const visiblePosts = isShowingSaved ? savedPosts : posts;
 
   return (
-    <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)]">
+    <div className="max-w-2xl mx-auto w-full sm:border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)]">
       <header className="sticky top-0 z-10 bg-[var(--bg-main)]/80 backdrop-blur-md border-b border-[var(--border)] p-4">
         <h1 className="text-xl font-bold text-[var(--text-main)]">{profile.name}</h1>
         <p className="text-sm text-[var(--text-main)]/60">@{profile.handle}</p>
@@ -893,7 +893,7 @@ export default function ProfileHandleClient() {
               bookTitle={post.book_title}
               bookCover={post.book_cover_url ?? post.video_url}
               media={post.media}
-              timeAgo={new Date(post.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+              createdAt={post.created_at}
               likes={post.likes?.[0]?.count ?? 0}
               comments={post.comments?.[0]?.count ?? 0}
               recent_comments={post.recent_comments}

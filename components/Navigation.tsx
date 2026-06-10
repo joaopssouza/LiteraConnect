@@ -162,8 +162,8 @@ export function Navigation() {
       <aside 
         onMouseLeave={() => setIsExpanded(false)}
         className={cn(
-          "hidden md:flex flex-col border-r border-[var(--border)] bg-[var(--surface)] h-screen fixed left-0 top-0 z-50 overflow-x-hidden p-3",
-          isExpanded ? "w-64 transition-[width] duration-300 ease-in-out" : "w-[72px]"
+          "hidden md:flex flex-col border-r border-[var(--border)] bg-[var(--surface)] h-screen fixed left-0 top-0 z-50 overflow-x-hidden p-4",
+          isExpanded ? "w-64 transition-[width] duration-300 ease-in-out shadow-[4px_0_24px_rgba(0,0,0,0.02)]" : "w-[80px]"
         )}
       >
         <div className="flex items-center gap-3 mb-8 px-2 h-8">
@@ -178,7 +178,7 @@ export function Navigation() {
           </span>
         </div>
 
-        <nav className="flex flex-col gap-2">
+        <nav className="flex flex-col gap-3 mt-4">
           {navItems.map((item) => {
             const isActive = pathname === item.href || (item.href === '/chat' && pathname === '/activity');
             const totalUnread = chatUnreadCount + activityUnreadCount;
@@ -189,15 +189,15 @@ export function Navigation() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center rounded-xl transition-colors w-full px-3 h-12 gap-3',
+                  'flex items-center rounded-2xl transition-all duration-300 w-full px-3 h-14 gap-4 group',
                   isActive
-                    ? 'bg-[var(--border)] text-[var(--text-main)] font-semibold'
-                    : 'text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 hover:text-[var(--text-main)]'
+                    ? 'text-[var(--text-main)] font-bold'
+                    : 'text-[var(--text-main)]/50 hover:bg-[var(--border)]/20 hover:text-[var(--text-main)]'
                 )}
                 title={!isExpanded ? item.label : undefined}
               >
-                <span className="relative inline-flex shrink-0">
-                  <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 2} />
+                <span className="relative inline-flex shrink-0 transition-transform duration-300 group-hover:scale-110">
+                  <item.icon className="w-[26px] h-[26px]" strokeWidth={isActive ? 2.5 : 1.75} />
                   {showBadge && (
                     <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-2 text-white text-[10px] font-bold inline-flex items-center justify-center border-2 border-[var(--surface)]">
                       {totalUnread > 99 ? '99+' : totalUnread}
@@ -219,11 +219,11 @@ export function Navigation() {
         <div className="mt-auto flex flex-col gap-4">
           <button
             onMouseEnter={() => setIsExpanded(true)}
-            className="flex items-center rounded-xl text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 hover:text-[var(--text-main)] transition-colors w-full text-left px-3 h-12 gap-3"
+            className="flex items-center rounded-2xl text-[var(--text-main)]/50 hover:bg-[var(--border)]/20 hover:text-[var(--text-main)] transition-all duration-300 w-full text-left px-3 h-14 gap-4 group"
             title={!isExpanded ? "Menu" : undefined}
           >
-            <span className="relative inline-flex shrink-0">
-              <Menu className="w-6 h-6" strokeWidth={2} />
+            <span className="relative inline-flex shrink-0 transition-transform duration-300 group-hover:scale-110">
+              <Menu className="w-[26px] h-[26px]" strokeWidth={1.75} />
             </span>
             <span className={cn(
               "text-lg whitespace-nowrap overflow-hidden",
@@ -237,11 +237,11 @@ export function Navigation() {
             <>
               <Link
                 href="/settings"
-                className="flex items-center rounded-xl text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 hover:text-[var(--text-main)] transition-colors w-full px-3 h-12 gap-3"
+                className="flex items-center rounded-2xl text-[var(--text-main)]/50 hover:bg-[var(--border)]/20 hover:text-[var(--text-main)] transition-all duration-300 w-full px-3 h-14 gap-4 group"
                 title={!isExpanded ? "Configurações" : undefined}
               >
-                <span className="relative inline-flex shrink-0">
-                  <Settings className="w-6 h-6" strokeWidth={2} />
+                <span className="relative inline-flex shrink-0 transition-transform duration-300 group-hover:scale-110">
+                  <Settings className="w-[26px] h-[26px]" strokeWidth={1.75} />
                 </span>
                 <span className={cn(
                   "text-lg whitespace-nowrap overflow-hidden",
@@ -252,11 +252,11 @@ export function Navigation() {
               </Link>
               <button
                 onClick={signOut}
-                className="flex items-center rounded-xl text-[var(--text-main)]/60 hover:bg-[var(--border)]/50 text-red-500 hover:text-red-600 transition-colors w-full text-left px-3 h-12 gap-3"
+                className="flex items-center rounded-2xl text-[var(--text-main)]/50 hover:bg-[var(--border)]/20 text-red-500/80 hover:text-red-500 transition-all duration-300 w-full text-left px-3 h-14 gap-4 group"
                 title={!isExpanded ? "Sair" : undefined}
               >
-                <span className="relative inline-flex shrink-0">
-                  <LogOut className="w-6 h-6" strokeWidth={2} />
+                <span className="relative inline-flex shrink-0 transition-transform duration-300 group-hover:scale-110">
+                  <LogOut className="w-[26px] h-[26px]" strokeWidth={1.75} />
                 </span>
                 <span className={cn(
                   "text-lg whitespace-nowrap overflow-hidden",
@@ -269,7 +269,7 @@ export function Navigation() {
           ) : (
             <Link
               href="/login"
-              className="flex items-center bg-brand-2 text-white rounded-xl font-bold hover:opacity-90 transition-all shadow-lg justify-center w-full px-3 h-12 gap-3"
+              className="flex items-center bg-brand-2 text-white rounded-2xl font-bold hover:opacity-90 hover:scale-[1.02] transition-all duration-300 shadow-[0_8px_20px_-8px_var(--color-brand-2)] justify-center w-full px-3 h-14 gap-4"
               title={!isExpanded ? "Entrar" : undefined}
             >
               <LogIn className="w-5 h-5 shrink-0" />
@@ -285,7 +285,7 @@ export function Navigation() {
       </aside>
 
       {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border)] flex items-center justify-around p-0 pb-safe z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--bg-main)]/90 backdrop-blur-xl border-t border-[var(--border)]/10 flex items-center justify-around px-2 py-2 pb-safe z-50">
         {navItems.map((item) => {
           const isActive = pathname === item.href || (item.href === '/chat' && pathname === '/activity');
           const totalUnread = chatUnreadCount + activityUnreadCount;
@@ -296,19 +296,22 @@ export function Navigation() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center gap-1 p-2 rounded-lg transition-colors',
-                isActive ? 'text-brand-2' : 'text-[var(--text-main)]/60'
+                'flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all duration-300 hover:bg-[var(--border)]/10',
+                isActive ? 'text-[var(--text-main)]' : 'text-[var(--text-main)]/40'
               )}
             >
-              <span className="relative inline-flex">
-                <item.icon className="w-7 h-7" strokeWidth={isActive ? 2.5 : 2} />
+              <span className="relative inline-flex transition-transform duration-300 active:scale-90">
+                <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 1.75} />
                 {showBadge && (
-                  <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-2 text-white text-[10px] font-bold inline-flex items-center justify-center border-2 border-[var(--surface)]">
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-2 text-white text-[9px] font-bold inline-flex items-center justify-center border-2 border-[var(--surface)]">
                     {totalUnread > 99 ? '99+' : totalUnread}
                   </span>
                 )}
               </span>
-              <span className="text-[11px] font-medium">{item.label}</span>
+              <span className={cn(
+                "text-[10px] font-medium tracking-wide transition-all",
+                isActive ? "font-bold opacity-100" : "opacity-80"
+              )}>{item.label}</span>
             </Link>
           );
         })}

@@ -32,7 +32,7 @@ const SkeletonPosts = () => (
 );
 
 export default function HomeClient() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { posts, loading, isLoadingMore, hasMore, error, loadInitial, sentinelRef } = useFeed();
 
   const [content, setContent] = useState('');
@@ -105,35 +105,37 @@ export default function HomeClient() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)]">
-      <header className="sticky top-0 z-10 bg-[var(--bg-main)]/80 backdrop-blur-md border-b border-[var(--border)] p-4 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-[var(--text-main)]">Feed de Resenhas</h1>
-      </header>
+    <div className="max-w-[1000px] mx-auto w-full min-h-screen bg-[var(--bg-main)] pb-24 lg:flex lg:gap-8 lg:px-4">
+      {/* Coluna Principal (Esquerda) */}
+      <div className="flex-1 w-full max-w-2xl mx-auto lg:mx-0">
+        <header className="sticky top-0 z-10 bg-[var(--bg-main)]/85 backdrop-blur-xl border-b border-[var(--border)]/10 pt-6 pb-4 px-4 sm:px-6 flex items-center justify-between">
+          <h1 className="text-[22px] font-black tracking-tight text-[var(--text-main)]">Feed de Resenhas</h1>
+        </header>
 
       {/* Create Post */}
       {user ? (
-        <div className="hidden md:flex gap-4 p-4 border-b border-[var(--border)] bg-[var(--surface)]">
-          <div className="w-12 h-12 rounded-full bg-brand-2 flex-shrink-0 flex items-center justify-center text-white font-bold overflow-hidden border border-[var(--border)]">
+        <div className="flex gap-4 md:gap-5 px-4 sm:px-6 py-6 border-b border-[var(--border)]/10 bg-[var(--surface)]/30 transition-colors focus-within:bg-[var(--surface)]/60">
+          <div className="w-12 h-12 rounded-full bg-brand-2 flex-shrink-0 flex items-center justify-center text-white font-bold overflow-hidden shadow-sm">
             {user.user_metadata?.avatar_url ? (
               <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
               <span>{user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}</span>
             )}
           </div>
-          <form onSubmit={handleCreatePost} className="flex-1">
+          <form onSubmit={handleCreatePost} className="flex-1 mt-1">
             <input
               type="text"
               placeholder="Título do livro (opcional)"
               value={bookTitle}
               onChange={(e) => setBookTitle(e.target.value)}
-              className="w-full bg-transparent outline-none text-sm font-medium text-[var(--text-main)] mb-2 placeholder:text-[var(--text-main)]/20"
+              className="w-full bg-transparent outline-none text-xl font-bold text-[var(--text-main)] mb-3 placeholder:text-[var(--text-main)]/30 tracking-tight"
             />
             <textarea
               placeholder="O que você está lendo hoje?"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               required
-              className="w-full bg-transparent resize-none outline-none text-lg text-[var(--text-main)] placeholder:text-[var(--text-main)]/20 min-h-[80px]"
+              className="w-full bg-transparent resize-none outline-none text-[1.1rem] leading-relaxed text-[var(--text-main)] placeholder:text-[var(--text-main)]/40 min-h-[100px]"
             />
             {imagePreview && (
               <div className="relative mb-4 inline-block w-full">
@@ -152,27 +154,27 @@ export default function HomeClient() {
               </div>
             )}
             <input type="file" accept="image/*,video/*" className="hidden" ref={fileInputRef} onChange={handleImageChange} />
-            <div className="flex justify-between items-center mt-2 pt-3 border-t border-[var(--border)]">
-              <div className="flex gap-1 text-brand-2">
-                <button type="button" className="p-2 hover:bg-[var(--border)]/50 rounded-full transition-colors">
-                  <Book className="w-5 h-5" />
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-[var(--border)]/30">
+              <div className="flex gap-2 text-[var(--text-main)]/50">
+                <button type="button" className="p-2.5 hover:bg-brand-2/10 hover:text-brand-2 rounded-full transition-colors group">
+                  <Book className="w-5 h-5 group-active:scale-95 transition-transform" />
                 </button>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 hover:bg-[var(--border)]/50 rounded-full transition-colors"
+                  className="p-2.5 hover:bg-brand-2/10 hover:text-brand-2 rounded-full transition-colors group"
                 >
-                  <ImageIcon className="w-5 h-5" />
+                  <ImageIcon className="w-5 h-5 group-active:scale-95 transition-transform" />
                 </button>
               </div>
 
-              <div className="flex gap-3 items-center">
-                <div className="hidden sm:flex rounded-xl overflow-hidden border border-[var(--border)] bg-[var(--surface)]">
+              <div className="flex gap-4 items-center">
+                <div className="hidden sm:flex rounded-full overflow-hidden border border-[var(--border)]/40 bg-[var(--surface)]/50 shadow-sm p-1">
                   <button
                     type="button"
                     onClick={() => setVisibility('public')}
-                    className={`inline-flex items-center px-3 py-1.5 text-xs font-bold transition-all ${
-                      visibility === 'public' ? 'bg-brand-2 text-white' : 'text-[var(--text-main)]/60 hover:bg-[var(--border)]/50'
+                    className={`inline-flex items-center px-4 py-1.5 text-xs font-bold rounded-full transition-all ${
+                      visibility === 'public' ? 'bg-brand-2 text-white shadow-md' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
                     }`}
                   >
                     <Globe size={14} className="mr-1.5" /> Público
@@ -180,8 +182,8 @@ export default function HomeClient() {
                   <button
                     type="button"
                     onClick={() => setVisibility('followers')}
-                    className={`inline-flex items-center px-3 py-1.5 text-xs font-bold transition-all border-l border-[var(--border)] ${
-                      visibility === 'followers' ? 'bg-brand-2 text-white' : 'text-[var(--text-main)]/60 hover:bg-[var(--border)]/50'
+                    className={`inline-flex items-center px-4 py-1.5 text-xs font-bold rounded-full transition-all ${
+                      visibility === 'followers' ? 'bg-brand-2 text-white shadow-md' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
                     }`}
                   >
                     <Users size={14} className="mr-1.5" /> Seguidores
@@ -189,8 +191,8 @@ export default function HomeClient() {
                   <button
                     type="button"
                     onClick={() => setVisibility('private')}
-                    className={`inline-flex items-center px-3 py-1.5 text-xs font-bold transition-all border-l border-[var(--border)] ${
-                      visibility === 'private' ? 'bg-brand-2 text-white' : 'text-[var(--text-main)]/60 hover:bg-[var(--border)]/50'
+                    className={`inline-flex items-center px-4 py-1.5 text-xs font-bold rounded-full transition-all ${
+                      visibility === 'private' ? 'bg-brand-2 text-white shadow-md' : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
                     }`}
                   >
                     <Lock size={14} className="mr-1.5" /> Privado
@@ -200,30 +202,31 @@ export default function HomeClient() {
                 <button
                   type="submit"
                   disabled={isPosting || !content.trim()}
-                  className="bg-brand-2 text-white px-6 py-2 rounded-full font-bold hover:opacity-90 transition-all disabled:opacity-40 shadow-md active:scale-95"
+                  className="bg-brand-2 text-white px-7 py-2.5 rounded-full font-bold hover:opacity-90 hover:scale-[1.02] transition-all disabled:opacity-40 disabled:hover:scale-100 shadow-[0_4px_14px_0_rgba(184,28,46,0.39)] active:scale-95 text-sm"
                 >
-                  {isPosting ? 'Postando...' : 'Postar'}
+                  {isPosting ? 'Postando...' : 'Publicar'}
                 </button>
               </div>
             </div>
           </form>
         </div>
       ) : (
-        <div className="hidden md:flex flex-col items-center justify-center p-10 border-b border-[var(--border)] bg-[var(--surface)] text-center">
-          <h2 className="text-xl font-bold text-[var(--text-main)] mb-2">Junte-se à conversa</h2>
-          <p className="text-[var(--text-main)]/60 mb-6 max-w-sm">Crie uma conta para compartilhar suas resenhas e interagir com outros leitores.</p>
-          <Link href="/login" className="bg-brand-2 text-white px-8 py-3 rounded-full font-bold hover:opacity-90 transition-all shadow-lg active:scale-95">
+        <div className="flex flex-col items-center justify-center py-16 px-4 border-b border-[var(--border)]/40 bg-[var(--surface)]/30 text-center">
+          <h2 className="text-2xl font-black text-[var(--text-main)] mb-3 tracking-tight">Participe da conversa</h2>
+          <p className="text-[var(--text-main)]/50 mb-8 max-w-sm text-[1.05rem] leading-relaxed">Crie uma conta para compartilhar suas resenhas literárias e interagir com outros leitores apaixonados.</p>
+          <Link href="/login" className="bg-brand-2 text-white px-10 py-3.5 rounded-full font-bold hover:opacity-90 hover:scale-[1.02] transition-all shadow-[0_8px_20px_-8px_var(--color-brand-2)] active:scale-95 text-[1.05rem]">
             Começar agora
           </Link>
         </div>
       )}
 
-      <div className="hidden md:block p-4 border-b border-[var(--border)] bg-[var(--surface)]/50">
+      {/* Sugestões Mobile/Tablet (Escondido no Desktop onde aparece a sidebar) */}
+      <div className="hidden md:block lg:hidden p-4 border-b border-[var(--border)]/10 bg-[var(--surface)]/50">
         <UserSuggestions title="Sugestões para você" />
       </div>
 
       {/* Lista de Posts */}
-      <div className="divide-y divide-[var(--border)]">
+      <div className="flex flex-col">
         {loading ? (
           <SkeletonPosts />
         ) : error ? (
@@ -244,7 +247,7 @@ export default function HomeClient() {
                 bookTitle={post.book_title ?? undefined}
                 bookCover={post.book_cover_url ?? post.video_url ?? undefined}
                 media={post.media}
-                timeAgo={new Date(post.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                createdAt={post.created_at}
                 likes={post.likes_count ?? 0}
                 comments={post.comments_count ?? 0}
                 recent_comments={post.recent_comments}
@@ -270,6 +273,68 @@ export default function HomeClient() {
         ) : (
           <div className="p-20 text-center text-[var(--text-main)]/40 font-medium">Nenhuma resenha encontrada. Seja o primeiro a postar!</div>
         )}
+      </div>
+      {/* Fim da Coluna Principal */}
+      </div>
+
+      {/* Sidebar (Direita - Desktop) */}
+      <div className="hidden lg:block w-[320px] shrink-0 pt-8">
+        <div className="sticky top-[88px]">
+          {/* Opcional: Perfil do usuário reduzido como no Instagram */}
+          {user && (
+            <div className="flex items-center gap-4 mb-6 px-2">
+              <Link href={`/profile/${user.user_metadata?.handle || ''}`} className="w-14 h-14 rounded-full bg-[var(--border)]/20 relative overflow-hidden flex-shrink-0 cursor-pointer">
+                {user.user_metadata?.avatar_url ? (
+                  <img src={resolveAvatarUrl(user.user_metadata.avatar_url, user.user_metadata?.handle || '', 100)} alt="Perfil" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-lg font-bold text-[var(--text-main)]">
+                    {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                  </div>
+                )}
+              </Link>
+              <div className="flex-1 min-w-0">
+                <Link href={`/profile/${user.user_metadata?.handle || ''}`} className="font-bold text-sm text-[var(--text-main)] hover:underline block truncate">
+                  {user.user_metadata?.handle || 'usuario'}
+                </Link>
+                <div className="text-sm text-[var(--text-main)]/50 truncate">
+                  {user.user_metadata?.full_name || ''}
+                </div>
+              </div>
+              <button onClick={() => signOut()} className="text-xs font-bold text-red-500 hover:underline cursor-pointer">
+                Sair da conta
+              </button>
+            </div>
+          )}
+          <UserSuggestions title="Sugestões para você" />
+          
+          {/* Footer Sidebar */}
+          <div className="mt-8 px-2 text-xs text-[var(--text-main)]/40 font-medium leading-relaxed">
+            <div className="flex flex-wrap gap-x-2 gap-y-1 mb-4">
+              <Link href="/sobre" className="hover:underline">Sobre</Link>
+              <span>·</span>
+              <Link href="/settings/ajuda" className="hover:underline">Ajuda</Link>
+              <span>·</span>
+              <Link href="/imprensa" className="hover:underline">Imprensa</Link>
+              <span>·</span>
+              <Link href="/api" className="hover:underline">API</Link>
+              <span>·</span>
+              <Link href="/carreiras" className="hover:underline">Carreiras</Link>
+              <span>·</span>
+              <Link href="/settings/central-privacidade" className="hover:underline">Privacidade</Link>
+              <span>·</span>
+              <Link href="/termos" className="hover:underline">Termos</Link>
+              <span>·</span>
+              <Link href="/localizacoes" className="hover:underline">Localizações</Link>
+              <span>·</span>
+              <span className="cursor-pointer hover:underline">Idioma</span>
+              <span>·</span>
+              <span className="cursor-pointer hover:underline">LiteraConnect Verified</span>
+            </div>
+            <div className="uppercase tracking-wide">
+              © {new Date().getFullYear()} LITERACONNECT
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

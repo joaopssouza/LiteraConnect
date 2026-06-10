@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 const ProfileRedirectClient = dynamic(() => import('./ProfileRedirectClient'), {
   ssr: false,
   loading: () => (
-    <div className="max-w-2xl mx-auto w-full border-x border-[var(--border)] min-h-screen bg-[var(--bg-main)] p-8 text-center text-[var(--text-main)]/60">
+    <div className="max-w-2xl mx-auto w-full sm:border-x border-[var(--border)]/10 min-h-screen bg-[var(--bg-main)] p-8 text-center text-[var(--text-main)]/60">
       Redirecionando...
     </div>
   ),

@@ -345,27 +345,31 @@ export function MediaViewerModal({
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex flex-col md:flex-row bg-black/95 backdrop-blur-md" ref={containerRef}>
+    <div 
+      className="fixed inset-0 z-[9999] flex flex-col md:flex-row bg-black/95 backdrop-blur-md" 
+      ref={containerRef}
+      onClick={(e) => e.stopPropagation()}
+    >
       {/* Left Side: Media Viewer (70% on desktop, 45% on mobile) */}
-      <div className="h-[45%] md:h-full w-full md:w-auto md:flex-[7] relative flex flex-col items-center justify-center overflow-hidden bg-black" onClick={onClose}>
+      <div className="h-[45%] md:h-full w-full md:w-auto md:flex-[7] relative flex flex-col items-center justify-center overflow-hidden bg-black" onClick={(e) => { e.stopPropagation(); onClose(); }}>
         
         {/* Top Controls */}
-        <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/60 to-transparent">
+        <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
           <button 
-            onClick={onClose}
-            className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors"
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors pointer-events-auto"
           >
             <X className="w-6 h-6" />
           </button>
           
-          <div className="flex gap-3">
-            <button onClick={handleZoomOut} className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors" disabled={zoomLevel <= 1}>
+          <div className="flex gap-3 pointer-events-auto">
+            <button onClick={(e) => { e.stopPropagation(); handleZoomOut(e); }} className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors cursor-pointer" disabled={zoomLevel <= 1}>
               <ZoomOut className="w-5 h-5" />
             </button>
-            <button onClick={handleZoomIn} className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors" disabled={zoomLevel >= 3}>
+            <button onClick={(e) => { e.stopPropagation(); handleZoomIn(e); }} className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors cursor-pointer" disabled={zoomLevel >= 3}>
               <ZoomIn className="w-5 h-5" />
             </button>
-            <button onClick={toggleFullscreen} className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors">
+            <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(e); }} className="p-3 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-colors cursor-pointer">
               <Maximize className="w-5 h-5" />
             </button>
           </div>

@@ -8,9 +8,8 @@ export default function Footer() {
 
   // Rotas onde o footer deve aparecer
   const showFooterPaths = ['/login', '/explore', '/settings', '/termos', '/privacidade'];
-  // O footer também deve aparecer na home (feed) `/`
   
-  const shouldShow = pathname === '/' || showFooterPaths.some(p => pathname.startsWith(p)) && !pathname.startsWith('/reels');
+  const shouldShow = showFooterPaths.some(p => pathname.startsWith(p)) && !pathname.startsWith('/reels') && pathname !== '/';
 
   if (!shouldShow) return null;
 

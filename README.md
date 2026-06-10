@@ -1,6 +1,4 @@
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" alt="LiteraConnect Banner" width="100%" style="border-radius: 10px;" />
-
   # 📚 LiteraConnect
 
   [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)

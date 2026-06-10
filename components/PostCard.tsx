@@ -70,6 +70,32 @@ function formatDisplayName(name?: string) {
   return trimmed;
 }
 
+export function formatTimeAgoShort(dateString: string) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'agora';
+  
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}min`;
+  
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h`;
+  
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return `${diffInDays}d`;
+  
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  if (diffInWeeks < 4) return `${diffInWeeks}sem`;
+  
+  const diffInMonths = Math.floor(diffInDays / 30);
+  if (diffInMonths < 12) return `${diffInMonths}mês`;
+  
+  const diffInYears = Math.floor(diffInDays / 365);
+  return `${diffInYears}a`;
+}
+
 interface PostProps {
   id: string;
   authorId?: string;
@@ -87,7 +113,8 @@ interface PostProps {
   reposts: number;
   views?: number;
   shares?: number;
-  timeAgo: string;
+  timeAgo?: string;
+  createdAt?: string;
   skipFetchCounts?: boolean;
   imagePriority?: boolean;
   onLocalPostPreferenceChange?: () => void;
@@ -96,7 +123,7 @@ interface PostProps {
   visibility?: string;
 }
 
-export function PostCard({ id, authorId, author, content, bookTitle, bookCover, media: initialMedia, likes: initialLikes, comments: initialComments, recent_comments, hideCommentInput = false, visibility = 'public', reposts, views, shares, timeAgo, skipFetchCounts = false, imagePriority = false, onLocalPostPreferenceChange }: PostProps) {
+export function PostCard({ id, authorId, author, content, bookTitle, bookCover, media: initialMedia, likes: initialLikes, comments: initialComments, recent_comments, hideCommentInput = false, visibility = 'public', reposts, views, shares, timeAgo, createdAt, skipFetchCounts = false, imagePriority = false, onLocalPostPreferenceChange }: PostProps) {
   const { user, profile } = useAuth();
   const { preferences } = usePreferences();
   const router = useRouter();
@@ -530,7 +557,11 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
 
   const handleCardClick = () => {
     if (isMenuOpen || modalState.open || isRepostModalOpen || isTrashModalOpen || isEditPostModalOpen) return;
-    router.push(`/post/${id}`);
+    if (mediaList.length > 0) {
+      setSelectedMediaIndex(0);
+    } else {
+      router.push(`/post/${id}`);
+    }
   };
 
   const handleProfileClick = (e: React.MouseEvent) => {
@@ -638,40 +669,52 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
 
   if (isHidden) return null;
 
+  const displayTimeAgo = createdAt ? formatTimeAgoShort(createdAt) : timeAgo;
+
   return (
     <article
+      onClick={handleCardClick}
       className={cn(
-        "p-4 border-b border-[var(--border)] bg-[var(--surface)] transition-opacity",
-        !(isRepostModalOpen || isEditPostModalOpen || isTrashModalOpen || modalState.open) && "hover:opacity-95",
+        "pt-6 pb-5 px-4 sm:px-6 bg-transparent transition-all duration-300 cursor-pointer",
+        !(isRepostModalOpen || isEditPostModalOpen || isTrashModalOpen || modalState.open) && "hover:bg-[var(--surface)]/20",
         (isRepostModalOpen || isEditPostModalOpen || isTrashModalOpen || modalState.open) && "relative z-[110]"
       )}
     >
       <div className="flex gap-3">
         <div
-          className="relative w-12 h-12 flex-shrink-0 cursor-pointer"
+          className="relative w-[42px] h-[42px] mt-0.5 flex-shrink-0 cursor-pointer"
           onClick={handleProfileClick}
         >
           <Image
             src={resolveAvatarUrl(author.avatar, author.handle, 100)}
             alt={author.name}
             fill
-            className="rounded-full object-cover bg-[var(--border)]/20"
+            className="rounded-full object-cover bg-[var(--surface)] shadow-sm"
             referrerPolicy="no-referrer"
-            sizes="48px"
+            sizes="42px"
             unoptimized
           />
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex items-start justify-between gap-2">
             <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-              <div className="flex items-center gap-1 sm:gap-2 flex-wrap min-w-0">
-                <span className="font-bold text-[var(--text-main)] hover:underline truncate" onClick={handleProfileClick}>
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <span className="font-bold text-[15px] text-[var(--text-main)] hover:underline truncate max-w-[150px] sm:max-w-[200px]" onClick={(e) => { e.stopPropagation(); handleProfileClick(e); }}>
                   {formatDisplayName(author.name)}
                 </span>
-                <span className="text-[var(--text-main)]/60 text-xs sm:text-sm truncate" onClick={handleProfileClick}>
+                <span className="text-[14px] text-[var(--text-main)]/50 truncate max-w-[100px] sm:max-w-[150px]" onClick={(e) => { e.stopPropagation(); handleProfileClick(e); }}>
                   @{author.handle}
                 </span>
-                <span className="text-[var(--text-main)]/60 text-xs sm:text-sm whitespace-nowrap">· {timeAgo}</span>
+                <span className="text-[var(--text-main)]/50">·</span>
+                <a 
+                  href={`/post/${id}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-[14px] text-[var(--text-main)]/50 hover:underline whitespace-nowrap"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {displayTimeAgo}
+                </a>
               </div>
               {bookTitle && (
                 <div className="relative" ref={shelfMenuRef}>
@@ -685,10 +728,10 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
                       setShelfMenuOpen(!shelfMenuOpen);
                     }}
                     className={cn(
-                      "inline-flex items-center self-start gap-1 px-2.5 py-1 mt-1 rounded-full text-xs font-bold border transition-all active:scale-95",
+                      "inline-flex items-center self-start gap-1.5 px-3 py-1 mt-2 rounded-md text-[10px] font-bold tracking-wider uppercase transition-all active:scale-95",
                       shelfStatus 
-                        ? "bg-green-600/10 text-green-600 border-green-600/20"
-                        : "bg-brand-2/10 text-brand-2 border-brand-2/20 hover:bg-brand-2/20"
+                        ? "bg-[var(--surface)] text-green-600 border border-[var(--border)]/50 shadow-sm"
+                        : "bg-[var(--surface)] text-brand-2 border border-[var(--border)]/50 shadow-sm hover:border-brand-2/30"
                     )}
                   >
                     <span>📚 Lendo: {bookTitle}</span>
@@ -735,7 +778,7 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
 
             <div className="relative" ref={menuRef}>
               <button
-                className="text-[var(--text-main)]/60 hover:text-[var(--text-main)] p-1 rounded-full hover:bg-[var(--border)]/30 transition-colors"
+                className="text-[var(--text-main)]/40 hover:text-[var(--text-main)] p-1.5 -mr-1 rounded-full hover:bg-[var(--border)]/20 transition-colors"
                 onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }}
               >
                 •••
@@ -777,8 +820,8 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
 
       <div className="mt-2">
           <div
-            className="mt-2 text-[var(--text-main)] whitespace-pre-wrap leading-relaxed transition-all relative"
-            style={{ fontSize: preferences?.fontSize ? `${preferences.fontSize}px` : '16px' }}
+            className="mt-4 text-[var(--text-main)] whitespace-pre-wrap leading-[1.7] tracking-normal transition-all relative font-sans"
+            style={{ fontSize: preferences?.fontSize ? `${preferences.fontSize}px` : '1.05rem' }}
           >
             {repostPreview ? (
               <>
@@ -799,7 +842,7 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
           {mediaList.length > 0 && !repostPreview && (
             <div 
               className={cn(
-                "mt-3 rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--border)]/5 grid gap-1",
+                "mt-4 rounded-2xl overflow-hidden border border-[var(--border)]/40 bg-[var(--surface)]/50 grid gap-1 shadow-sm",
                 mediaList.length === 1 ? "grid-cols-1" : "grid-cols-2"
               )}
             >
@@ -846,48 +889,57 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
             </div>
           )}
 
-          <div className="flex items-center justify-between mt-4 text-[var(--text-main)]/60 max-w-md">
-            <button onClick={handleLike} className={cn("flex items-center gap-2 transition-colors hover:text-brand-2", isLiked && "text-brand-2")}>
-              <div className={cn("p-2 rounded-full", isLiked ? "bg-brand-2/10" : "hover:bg-brand-2/10")}>
-                <Heart className={cn("w-5 h-5", isLiked && "fill-current")} />
+          <div className="flex items-center justify-between mt-5 text-[var(--text-main)]/50 max-w-[90%] md:max-w-md ml-[-8px]">
+            <button onClick={handleLike} className={cn("flex items-center gap-1.5 transition-all duration-300 hover:text-brand-2 group", isLiked && "text-brand-2")}>
+              <div className={cn("p-2 rounded-full transition-all duration-300", isLiked ? "bg-brand-2/10" : "group-hover:bg-brand-2/10")}>
+                <Heart className={cn("w-5 h-5 group-active:scale-90 transition-transform", isLiked && "fill-current")} />
               </div>
-              <span className="text-sm">{likesCount}</span>
+              <span className="text-sm font-medium">{likesCount > 0 ? likesCount : ''}</span>
             </button>
-            <span className="flex items-center gap-1.5 text-[var(--text-main)]/40 select-none">
-              <Eye className="w-4 h-4" />
-              <span className="text-sm">
+            <span className="flex items-center gap-1.5 text-[var(--text-main)]/30 select-none group">
+              <div className="p-2 rounded-full">
+                <Eye className="w-5 h-5" />
+              </div>
+              <span className="text-sm font-medium">
                 {((v) => v >= 1000000
                   ? `${(v / 1000000).toFixed(1)}M`
                   : v >= 1000
                   ? `${(v / 1000).toFixed(1)}K`
-                  : v)(views ?? 0)}
+                  : v > 0 ? v : '')(views ?? 0)}
               </span>
             </span>
-            <button className="flex items-center gap-2 hover:text-brand-2 transition-colors">
-              <div className="p-2 rounded-full hover:bg-brand-2/10">
-                <MessageCircle className="w-5 h-5" />
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                if (mediaList.length > 0) setSelectedMediaIndex(0); 
+                else router.push(`/post/${id}`); 
+              }} 
+              className="flex items-center gap-1.5 hover:text-brand-2 transition-all duration-300 group cursor-pointer"
+            >
+              <div className="p-2 rounded-full group-hover:bg-brand-2/10 transition-colors">
+                <MessageCircle className="w-5 h-5 group-active:scale-90 transition-transform" />
               </div>
-              <span className="text-sm">{commentsCount}</span>
+              <span className="text-sm font-medium">{commentsCount > 0 ? commentsCount : ''}</span>
             </button>
-            <button onClick={handleRepost} className="flex items-center gap-2 hover:text-brand-2 transition-colors">
-              <div className="p-2 rounded-full hover:bg-brand-2/10">
-                <Repeat2 className="w-5 h-5" />
+            <button onClick={handleRepost} className="flex items-center gap-1.5 hover:text-brand-2 transition-all duration-300 group cursor-pointer">
+              <div className="p-2 rounded-full group-hover:bg-brand-2/10 transition-colors">
+                <Repeat2 className="w-5 h-5 group-active:scale-90 transition-transform" />
               </div>
-              <span className="text-sm">{repostsCount}</span>
+              <span className="text-sm font-medium">{repostsCount > 0 ? repostsCount : ''}</span>
             </button>
-            <button onClick={handleShare} className="flex items-center gap-2 hover:text-brand-2 transition-colors">
-              <div className="p-2 rounded-full hover:bg-brand-2/10">
-                <Share className="w-5 h-5" />
+            <button onClick={handleShare} className="flex items-center gap-1.5 hover:text-brand-2 transition-all duration-300 group">
+              <div className="p-2 rounded-full group-hover:bg-brand-2/10 transition-colors">
+                <Share className="w-5 h-5 group-active:scale-90 transition-transform" />
               </div>
             </button>
           </div>
 
-          {/* Comentários compactos e campo de input para todos os posts */}
-          <div className="mt-4 border-t border-[var(--border)] pt-3">
-              {((feedComments && feedComments.length > 0) || isSubmittingComment) && (
-                <div className="space-y-2 mb-3">
-                  {isSubmittingComment && (
-                    <div className="flex flex-col gap-1 animate-pulse">
+          {/* Comentários compactos para todos os posts */}
+          {((feedComments && feedComments.length > 0) || isSubmittingComment) && (
+            <div className="mt-4 pt-3">
+              <div className="space-y-2 mb-3">
+                {isSubmittingComment && (
+                  <div className="flex flex-col gap-1 animate-pulse">
                       <div className="flex gap-2 text-sm items-start">
                         <div className="w-6 h-6 rounded-full bg-[var(--border)]/60 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
@@ -1021,36 +1073,8 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
                     </button>
                   )}
                 </div>
-              )}
-              {!hideCommentInput && user && (
-                <form onSubmit={handleFeedCommentSubmit} onClick={e => e.stopPropagation()} className="flex items-center gap-2">
-                  <div className="w-6 h-6 relative flex-shrink-0 bg-[var(--border)]/20 rounded-full overflow-hidden">
-                    <Image
-                      src={resolveAvatarUrl(profile?.avatar_url || user.user_metadata?.avatar_url, profile?.handle || user.user_metadata?.handle, 50)}
-                      alt=""
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  </div>
-                  <input 
-                    type="text" 
-                    value={newComment}
-                    onChange={e => setNewComment(e.target.value)}
-                    placeholder="Escreva um comentário..."
-                    className="flex-1 bg-[var(--text-main)]/10 rounded-full px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-brand-2/50 placeholder:text-[var(--text-main)]/40 text-[var(--text-main)]"
-                    disabled={isSubmittingComment}
-                  />
-                  <button 
-                    type="submit"
-                    disabled={!newComment.trim() || isSubmittingComment}
-                    className="text-brand-2 font-bold text-sm disabled:opacity-40 pr-1"
-                  >
-                    Enviar
-                  </button>
-                </form>
-              )}
-            </div>
+              </div>
+          )}
         </div>
 
       {/* Modais com o novo design */}
@@ -1102,7 +1126,7 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
                           setEditBookCover(null);
                           setEditMedia([]);
                         }}
-                        className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full transition-colors"
+                        className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full transition-colors cursor-pointer"
                         title="Remover mídia"
                       >
                         <X className="w-4 h-4" />
@@ -1145,7 +1169,7 @@ export function PostCard({ id, authorId, author, content, bookTitle, bookCover, 
           onClose={() => setSelectedMediaIndex(null)}
           author={author}
           content={content}
-          timeAgo={timeAgo}
+          timeAgo={displayTimeAgo || ''}
           likesCount={likesCount}
           commentsCount={commentsCount}
           sharesCount={sharesCount ?? 0}
