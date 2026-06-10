@@ -7,10 +7,11 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 export function Navigation() {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [activityUnreadCount, setActivityUnreadCount] = useState(0);
@@ -183,6 +184,8 @@ export function Navigation() {
             const isActive = pathname === item.href || (item.href === '/chat' && pathname === '/activity');
             const totalUnread = chatUnreadCount + activityUnreadCount;
             const showBadge = item.href === '/chat' && totalUnread > 0;
+            const isProfileIcon = item.href === '/profile';
+            const hasAvatar = isProfileIcon && profile?.avatar_url;
 
             return (
               <Link
@@ -197,7 +200,20 @@ export function Navigation() {
                 title={!isExpanded ? item.label : undefined}
               >
                 <span className="relative inline-flex shrink-0 transition-transform duration-300 group-hover:scale-110">
-                  <item.icon className="w-[26px] h-[26px]" strokeWidth={isActive ? 2.5 : 1.75} />
+                  {hasAvatar ? (
+                    <div className={cn(
+                      "w-[26px] h-[26px] rounded-full overflow-hidden border relative flex-shrink-0 bg-[var(--border)]/10",
+                      isActive ? "border-brand-2" : "border-[var(--border)]"
+                    )}>
+                      <img 
+                        src={resolveAvatarUrl(profile.avatar_url, profile.handle || user?.id || '')} 
+                        alt="Perfil" 
+                        className="w-full h-full object-cover" 
+                      />
+                    </div>
+                  ) : (
+                    <item.icon className="w-[26px] h-[26px]" strokeWidth={isActive ? 2.5 : 1.75} />
+                  )}
                   {showBadge && (
                     <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-brand-2 text-white text-[10px] font-bold inline-flex items-center justify-center border-2 border-[var(--surface)]">
                       {totalUnread > 99 ? '99+' : totalUnread}
@@ -290,6 +306,8 @@ export function Navigation() {
           const isActive = pathname === item.href || (item.href === '/chat' && pathname === '/activity');
           const totalUnread = chatUnreadCount + activityUnreadCount;
           const showBadge = item.href === '/chat' && totalUnread > 0;
+          const isProfileIcon = item.href === '/profile';
+          const hasAvatar = isProfileIcon && profile?.avatar_url;
 
           return (
             <Link
@@ -301,7 +319,20 @@ export function Navigation() {
               )}
             >
               <span className="relative inline-flex transition-transform duration-300 active:scale-90">
-                <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 1.75} />
+                {hasAvatar ? (
+                  <div className={cn(
+                    "w-6 h-6 rounded-full overflow-hidden border relative flex-shrink-0 bg-[var(--border)]/10",
+                    isActive ? "border-brand-2" : "border-[var(--border)]/30"
+                  )}>
+                    <img 
+                      src={resolveAvatarUrl(profile.avatar_url, profile.handle || user?.id || '')} 
+                      alt="Perfil" 
+                      className="w-full h-full object-cover" 
+                    />
+                  </div>
+                ) : (
+                  <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 1.75} />
+                )}
                 {showBadge && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-2 text-white text-[9px] font-bold inline-flex items-center justify-center border-2 border-[var(--surface)]">
                     {totalUnread > 99 ? '99+' : totalUnread}
